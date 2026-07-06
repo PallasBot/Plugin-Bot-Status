@@ -5,6 +5,9 @@
 
 ## [Unreleased]
 
+## [4.0.13] - 2026-07-06
+- fix(status): 牛牛在吗在协议端已报离线时优先展示离线，避免僵尸 WS 仍显示在线
+
 ## [4.0.12] - 2026-06-28
 - refactor(config): 名册模式 WebUI 说明去 fleet/worker/WS 等维护者黑话
 

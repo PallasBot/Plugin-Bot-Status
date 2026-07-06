@@ -17,6 +17,12 @@ offline_bots: dict[int, dict[str, str]] = {}
 STATUS_COOLDOWN_KEY: str = "bot_status"
 
 
+def protocol_offline_marked(bot_id: int) -> bool:
+    """协议端/断线流程已记入 offline_bots（含宽限待确认）。"""
+    rec = offline_bots.get(bot_id)
+    return isinstance(rec, dict) and bool(rec.get("source"))
+
+
 def cluster_online_bot_ids(current_bots: dict | None = None) -> set[int]:
     """在线集合。"""
     return cluster_online_bot_ids_for_status(current_bots)
@@ -191,10 +197,13 @@ async def get_bot_status_info() -> tuple[dict[int, str], dict[int, str]]:
 
     async def get_nickname_with_status(bot_id: int) -> tuple[int, str, bool]:
         """获取昵称和在线状态任务"""
-        if bot_id in online_ids:
-            nickname = await get_bot_nickname(bot_id, current_bots)
-            return bot_id, nickname, True
         nickname = await get_bot_nickname(bot_id, current_bots)
+        # NapCat/Lagrange 掉线或宽限判离线后，优先于僵尸 WS / 滞后 presence。
+        if protocol_offline_marked(bot_id):
+            offline_bots[bot_id]["nickname"] = nickname
+            return bot_id, nickname, False
+        if bot_id in online_ids:
+            return bot_id, nickname, True
         if bot_id in offline_bots:
             offline_bots[bot_id]["nickname"] = nickname
         return bot_id, nickname, False
