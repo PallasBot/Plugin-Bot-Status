@@ -5,10 +5,9 @@
 
 ## [Unreleased]
 
+## [4.0.15] - 2026-07-25
 
-## [$new] - $TODAY
-
-- chore(ci): 对齐 ruff 0.16 与主仓 ruff.toml，修复 lint
+- feat: PluginMetadata.extra 增加 `help_tag`（帮助图分组）
 
 ## [4.0.13] - 2026-07-06
 - fix(status): 牛牛在吗在协议端已报离线时优先展示离线，避免僵尸 WS 仍显示在线
