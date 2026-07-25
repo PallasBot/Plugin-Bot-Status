@@ -18,24 +18,21 @@ from nonebot.adapters.onebot.v11 import (
 )
 from nonebot.params import CommandArg
 from nonebot.plugin import PluginMetadata
-
-from pallas.api.perm import permission_for_command
+from pallas.api.limits import (
+    is_command_cooldown_ready,
+    refresh_command_cooldown,
+)
 from pallas.api.metadata import (
     PLUGIN_EXTRA_VERSION,
     PLUGIN_HOMEPAGE,
     PLUGIN_MENU_TEMPLATE,
-)
-from pallas.api.metadata import (
     SCENE_BOTH,
     SCENE_GROUP,
     SCENE_PRIVATE,
     join_usage,
     usage_line,
 )
-from pallas.api.limits import (
-    is_command_cooldown_ready,
-    refresh_command_cooldown,
-)
+from pallas.api.perm import permission_for_command
 from pallas.core.platform.shard import context as shard_ctx
 from pallas.product.llm.knowledge.declare import knowledge_source_row
 
@@ -133,10 +130,7 @@ __plugin_meta__ = PluginMetadata(
                 "trigger_condition": "离线邮件",
                 "command_permission": "bot_status.offline_mail",
                 "brief_des": "向离线牛牛号主发信",
-                "detail_des": (
-                    "根据当前离线名册，向各离线牛牛号主的 QQ 邮箱发送提醒；"
-                    "可带 QQ 号仅通知指定牛牛。"
-                ),
+                "detail_des": ("根据当前离线名册，向各离线牛牛号主的 QQ 邮箱发送提醒；可带 QQ 号仅通知指定牛牛。"),
             },
             {
                 "func": "牛牛依次报数",
@@ -156,18 +150,12 @@ __plugin_meta__ = PluginMetadata(
                 chunks=[
                     {
                         "title": "查看在线情况",
-                        "content": (
-                            "发送「牛牛在吗」可查看当前在线与离线的牛牛列表；"
-                            "具体可见范围取决于实例配置。"
-                        ),
+                        "content": ("发送「牛牛在吗」可查看当前在线与离线的牛牛列表；具体可见范围取决于实例配置。"),
                         "keywords": "在吗,在线,离线,状态,活着",
                     },
                     {
                         "title": "群内报数",
-                        "content": (
-                            "群内发送「牛牛报数」或「牛牛出列」，"
-                            "当前群里在线的牛牛会依次报到。"
-                        ),
+                        "content": ("群内发送「牛牛报数」或「牛牛出列」，当前群里在线的牛牛会依次报到。"),
                         "keywords": "报数,出列,报到,依次",
                     },
                     {
@@ -181,8 +169,7 @@ __plugin_meta__ = PluginMetadata(
                     {
                         "title": "自动离线通知",
                         "content": (
-                            "若牛牛离线过久且已配置 SMTP，系统可能自动向号主发信；"
-                            "私聊「测试邮件」可验证 SMTP。"
+                            "若牛牛离线过久且已配置 SMTP，系统可能自动向号主发信；私聊「测试邮件」可验证 SMTP。"
                         ),
                         "keywords": "邮件,离线,通知,测试邮件",
                     },
@@ -284,9 +271,7 @@ async def handle_bot_offline_events(event: NoticeEvent):
         )
 
         await mark_protocol_bot_offline(qq)
-        asyncio.create_task(
-            close_local_bot_connection(qq), name=f"protocol_offline_close_ws:{qq}"
-        )
+        asyncio.create_task(close_local_bot_connection(qq), name=f"protocol_offline_close_ws:{qq}")
 
         # 发送离线通知
         await notify_bot_offline(bot_id, nickname, offline_message)
@@ -319,12 +304,8 @@ async def handle_bot_status(bot: Bot, event: MessageEvent) -> None:
     online_info: str = ""
     online_count: int = len(online_bots)
     if online_bots:
-        bot_info_list: list[str] = [
-            f"{nickname} ({bot_id})" for bot_id, nickname in online_bots.items()
-        ]
-        online_info = f"在线的牛牛 (Total: {online_count}):\n" + "\n".join(
-            bot_info_list
-        )
+        bot_info_list: list[str] = [f"{nickname} ({bot_id})" for bot_id, nickname in online_bots.items()]
+        online_info = f"在线的牛牛 (Total: {online_count}):\n" + "\n".join(bot_info_list)
     else:
         online_info = ""
 
@@ -332,13 +313,8 @@ async def handle_bot_status(bot: Bot, event: MessageEvent) -> None:
     offline_info: str = ""
     offline_count: int = len(offline_bots_filtered)
     if offline_bots_filtered:
-        offline_list: list[str] = [
-            f"{nickname} ({bot_id})"
-            for bot_id, nickname in offline_bots_filtered.items()
-        ]
-        offline_info = f"\n\n离线的牛牛 (Total: {offline_count}):\n" + "\n".join(
-            offline_list
-        )
+        offline_list: list[str] = [f"{nickname} ({bot_id})" for bot_id, nickname in offline_bots_filtered.items()]
+        offline_info = f"\n\n离线的牛牛 (Total: {offline_count}):\n" + "\n".join(offline_list)
 
     if offline_info:
         message: str = online_info + offline_info
@@ -376,21 +352,15 @@ async def handle_bot_count(bot: Bot, event: MessageEvent) -> None:
     for index, bot_id in enumerate(group_bot_ids, start=1):
         bot_instance = current_bots[str(bot_id)]
         try:
-            await bot_instance.send_group_msg(
-                group_id=event.group_id, message=str(f"牛牛{index}号报到！")
-            )
+            await bot_instance.send_group_msg(group_id=event.group_id, message=str(f"牛牛{index}号报到！"))
             await asyncio.sleep(0.3)
         except Exception as e:
-            logger.warning(
-                f"bot [{bot_id}] bot_count send_group_msg failed in group [{event.group_id}]: {e}"
-            )
+            logger.warning(f"bot [{bot_id}] bot_count send_group_msg failed in group [{event.group_id}]: {e}")
             failed_bots.append(bot_id)
 
     if failed_bots:
         online_bots, _ = await get_bot_status_info()
-        failed_text = "、".join(
-            online_bots.get(bot_id, str(bot_id)) for bot_id in failed_bots
-        )
+        failed_text = "、".join(online_bots.get(bot_id, str(bot_id)) for bot_id in failed_bots)
         await bot_count_cmd.finish(f"报数完成，以下牛牛没能报数：{failed_text}")
 
     await bot_count_cmd.finish("牛牛们报数完毕！")

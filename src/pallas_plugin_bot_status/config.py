@@ -1,16 +1,13 @@
 from typing import Literal
 
-from pydantic import BaseModel, Field
-
 from pallas.api.config import install_hot_reload_config
+from pydantic import BaseModel, Field
 
 StatusListModeSetting = Literal["auto", "session", "fleet", "connected"]
 
 
 class Config(BaseModel, extra="ignore"):
-    bot_status_notice_email: str = Field(
-        default="", description="接收 Bot 状态告警（如掉线）的收件人邮箱。"
-    )
+    bot_status_notice_email: str = Field(default="", description="接收 Bot 状态告警（如掉线）的收件人邮箱。")
     bot_status_offline_grace_time: int = Field(
         default=30,
         description="判定为离线并发送邮件通知前，允许无心跳的宽限时间（分钟）。",

@@ -7,14 +7,13 @@ import contextlib
 from typing import TYPE_CHECKING
 
 from nonebot import logger
-
-from pallas.api.platform_fleet_probe import list_local_fleet_bots_in_group
-from pallas.core.platform.shard import context as shard_ctx
 from pallas.api.platform import (
     STAGGER_SEC,
     run_shard_coordinated_bot_count,
     update_shard_bot_count_registration,
 )
+from pallas.api.platform_fleet_probe import list_local_fleet_bots_in_group
+from pallas.core.platform.shard import context as shard_ctx
 
 if TYPE_CHECKING:
     from collections.abc import Awaitable, Callable
@@ -67,13 +66,9 @@ async def handle_shard_bot_count(
     index, total = coord
     await asyncio.sleep((index - 1) * STAGGER_SEC)
     try:
-        await bot.send_group_msg(
-            group_id=event.group_id, message=f"牛牛{index}号报到！"
-        )
+        await bot.send_group_msg(group_id=event.group_id, message=f"牛牛{index}号报到！")
     except Exception as e:
-        logger.warning(
-            f"bot [{self_id}] shard bot_count send failed in group [{event.group_id}]: {e}"
-        )
+        logger.warning(f"bot [{self_id}] shard bot_count send failed in group [{event.group_id}]: {e}")
         return
     if index == total:
         await asyncio.sleep(0.3)

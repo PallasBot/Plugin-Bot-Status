@@ -5,10 +5,11 @@ from __future__ import annotations
 from typing import Literal
 
 from nonebot import get_bots
-
-from pallas.api.platform import connected_bot_ids
-from pallas.api.platform import get_fleet_bot_ids
-from pallas.api.platform import get_session_seen_bot_ids
+from pallas.api.platform import (
+    connected_bot_ids,
+    get_fleet_bot_ids,
+    get_session_seen_bot_ids,
+)
 from pallas.core.platform.shard import context as shard_ctx
 
 from .config import get_bot_status_config
@@ -26,9 +27,7 @@ def resolve_status_list_mode() -> ResolvedListMode:
     return "fleet" if shard_ctx.sharding_active() else "session"
 
 
-def status_inventory_bot_ids(
-    *, list_mode: ResolvedListMode | None = None
-) -> frozenset[int]:
+def status_inventory_bot_ids(*, list_mode: ResolvedListMode | None = None) -> frozenset[int]:
     """名册 QQ：session=本进程；connected=曾上线；fleet=协议端已启用。"""
     mode = list_mode or resolve_status_list_mode()
     if mode == "fleet":

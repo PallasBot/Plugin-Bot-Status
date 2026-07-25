@@ -37,33 +37,23 @@ async def get_bot_nickname(bot_id: int, current_bots: dict = None) -> str:
         # 首先尝试让牛牛自己获取自己的信息
         if str(bot_id) in bots:
             try:
-                info = await bots[str(bot_id)].call_api(
-                    "get_stranger_info", user_id=bot_id
-                )
+                info = await bots[str(bot_id)].call_api("get_stranger_info", user_id=bot_id)
                 nickname = info.get("nickname", "Unknown Nickname")
                 if nickname != "Unknown Nickname":
                     return nickname
             except Exception as e:
                 logger.debug(f"bot [{bot_id}] get_stranger_info via self failed: {e}")
 
-        available_bots = [
-            bot_instance
-            for bot_id_key, bot_instance in bots.items()
-            if int(bot_id_key) != bot_id
-        ]
+        available_bots = [bot_instance for bot_id_key, bot_instance in bots.items() if int(bot_id_key) != bot_id]
 
         max_retries = 3
         for attempt in range(max_retries):
             if attempt > 0:
-                logger.debug(
-                    f"bot [{bot_id}] nickname lookup retry {attempt + 1}/{max_retries}"
-                )
+                logger.debug(f"bot [{bot_id}] nickname lookup retry {attempt + 1}/{max_retries}")
 
             for bot_instance in available_bots:
                 try:
-                    info = await bot_instance.call_api(
-                        "get_stranger_info", user_id=bot_id
-                    )
+                    info = await bot_instance.call_api("get_stranger_info", user_id=bot_id)
                     nickname = info.get("nickname", "Unknown Nickname")
                     if nickname != "Unknown Nickname":
                         return nickname
@@ -85,8 +75,7 @@ async def get_bot_nickname(bot_id: int, current_bots: dict = None) -> str:
 
 async def handle_bot_connect(bot: Bot) -> None:
     bot_id: int = int(bot.self_id)
-    if bot_id in offline_bots:
-        del offline_bots[bot_id]
+    offline_bots.pop(bot_id, None)
 
 
 async def handle_bot_disconnect(bot: Bot) -> None:
@@ -108,9 +97,7 @@ async def handle_bot_disconnect(bot: Bot) -> None:
         scheduler.remove_job(job_id)
 
     # 计算运行时间
-    run_time: datetime = datetime.now() + timedelta(
-        seconds=get_bot_status_config().bot_status_offline_grace_time
-    )
+    run_time: datetime = datetime.now() + timedelta(seconds=get_bot_status_config().bot_status_offline_grace_time)
 
     scheduler.add_job(
         id=job_id,
@@ -140,14 +127,10 @@ async def check_bot_still_offline(bot_id: int, nickname: str) -> None:
 
     bots = get_bots()
     if str(bot_id) not in bots:
-        logger.warning(
-            f"bot [{bot_id}] still offline after grace, sending notification"
-        )
+        logger.warning(f"bot [{bot_id}] still offline after grace, sending notification")
         # 更新离线时间
         if bot_id in offline_bots:
-            offline_bots[bot_id]["offline_time"] = datetime.now().strftime(
-                "%Y-%m-%d %H:%M:%S"
-            )
+            offline_bots[bot_id]["offline_time"] = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
         else:
             # 如果不在离线列表中，则添加进去
             offline_bots[bot_id] = {
