@@ -5,6 +5,11 @@
 
 ## [Unreleased]
 
+
+## [$new] - $TODAY
+
+- chore(ci): 对齐 ruff 0.16 与主仓 ruff.toml，修复 lint
+
 ## [4.0.13] - 2026-07-06
 - fix(status): 牛牛在吗在协议端已报离线时优先展示离线，避免僵尸 WS 仍显示在线
 
