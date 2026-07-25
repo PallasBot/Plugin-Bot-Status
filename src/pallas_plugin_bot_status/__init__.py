@@ -33,6 +33,7 @@ from pallas.api.metadata import (
     usage_line,
 )
 from pallas.api.perm import permission_for_command
+from pallas.api.platform import llm_command_tool_row
 from pallas.core.platform.shard import context as shard_ctx
 from pallas.product.llm.knowledge.declare import knowledge_source_row
 
@@ -96,6 +97,15 @@ __plugin_meta__ = PluginMetadata(
             {"id": "bot_status.count", "cd_sec": 10},
             {"id": "bot_status.test_mail", "cd_sec": 10},
             {"id": "bot_status.offline_mail", "cd_sec": 30},
+        ],
+        "llm_tools": [
+            llm_command_tool_row(
+                name="bot_status.count",
+                command_id="bot_status.count",
+                description="让群内在线牛牛依次报数。用户说报数、出列时使用。",
+                parameters={"type": "object", "properties": {}},
+                command_template="牛牛报数",
+            ),
         ],
         "ingress_fanout": {
             "scope": "shard_only",

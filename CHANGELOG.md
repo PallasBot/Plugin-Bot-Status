@@ -5,6 +5,9 @@
 
 ## [Unreleased]
 
+## [4.0.16] - 2026-07-25
+
+- feat: 声明群口令 `llm_tools`，供闲聊 selective 工具调用
 ## [4.0.15] - 2026-07-25
 
 - feat: PluginMetadata.extra 增加 `help_tag`（帮助图分组）
