@@ -105,6 +105,7 @@ __plugin_meta__ = PluginMetadata(
                 description="让群内在线牛牛依次报数。用户说报数、出列时使用。",
                 parameters={"type": "object", "properties": {}},
                 command_template="牛牛报数",
+                hints=["报数", "出列", "在线牛牛报数"],
             ),
         ],
         "ingress_fanout": {
