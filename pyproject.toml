@@ -1,6 +1,6 @@
 [project]
 name = "pallas-plugin-bot-status"
-version = "4.0.16"
+version = "4.0.17"
 description = "Pallas-Bot 官方扩展：牛牛在吗、报数与离线邮件通知。"
 readme = "README.md"
 license = { file = "LICENSE" }

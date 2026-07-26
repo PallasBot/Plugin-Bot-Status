@@ -5,6 +5,10 @@
 
 ## [Unreleased]
 
+## [4.0.17] - 2026-07-26
+
+- feat(llm_tools): 为口令工具补充口语 hints
+
 ## [4.0.16] - 2026-07-25
 
 - feat: 声明群口令 `llm_tools`，供闲聊 selective 工具调用
