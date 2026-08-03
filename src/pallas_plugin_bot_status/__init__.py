@@ -38,6 +38,7 @@ from pallas.core.platform.shard import context as shard_ctx
 from pallas.product.llm.knowledge.declare import knowledge_source_row
 
 from .bot_monitor import (
+    get_bot_nickname,
     get_bot_status_info,
     handle_bot_connect,
     handle_bot_disconnect,
@@ -318,7 +319,23 @@ async def handle_bot_status(bot: Bot, event: MessageEvent) -> None:
 
     if federate_ingress_active():
         await sync_federate_peer_bot_roster()
-        message = format_federate_status_rosters(await get_federate_bot_rosters())
+        rosters = await get_federate_bot_rosters()
+        public_online_ids = sorted(
+            qq
+            for roster in rosters
+            if roster.online_bot_ids is not None
+            for qq in roster.online_bot_ids & roster.public_bot_ids
+        )
+        nickname_results = await asyncio.gather(
+            *(get_bot_nickname(qq) for qq in public_online_ids),
+            return_exceptions=True,
+        )
+        nicknames_by_id = {
+            qq: nickname
+            for qq, nickname in zip(public_online_ids, nickname_results, strict=True)
+            if isinstance(nickname, str) and nickname.strip()
+        }
+        message = format_federate_status_rosters(rosters, nicknames_by_id=nicknames_by_id)
         await bot_status_cmd.finish(message or "暂无在线牛牛")
 
     # 获取牛牛状态信息

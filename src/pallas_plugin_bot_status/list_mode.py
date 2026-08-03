@@ -75,11 +75,17 @@ def cluster_online_bot_ids_for_status(
     return out
 
 
-def format_federate_status_rosters(rosters: Iterable[FederatePeerBotRoster]) -> str:
+def format_federate_status_rosters(
+    rosters: Iterable[FederatePeerBotRoster],
+    *,
+    nicknames_by_id: dict[int, str] | None = None,
+) -> str:
     """按部署展示协同池在线牛牛，QQ 仅展示对端允许公开的账号。"""
+    nicknames = nicknames_by_id or {}
     sections: list[str] = []
     for roster in rosters:
-        name = roster.deployment_name or f"部署 {roster.deployment_id or '未知'}"
+        deployment_id = roster.deployment_id or "未知"
+        name = roster.deployment_name or f"部署 {deployment_id[:7]}"
         online_ids = roster.online_bot_ids
         if online_ids is None:
             sections.append(f"{name}：状态未知（对端待升级）")
@@ -89,9 +95,11 @@ def format_federate_status_rosters(rosters: Iterable[FederatePeerBotRoster]) -> 
             continue
         public_ids = sorted(online_ids & roster.public_bot_ids)
         hidden_count = len(online_ids) - len(public_ids)
-        lines = [f"{name}：{len(online_ids)} 只在线"]
+        lines = [f"{name}：{len(online_ids)}只在线"]
         if public_ids:
-            lines.append("QQ：" + "、".join(str(qq) for qq in public_ids))
+            for qq in public_ids:
+                nickname = nicknames.get(qq, "").strip()
+                lines.append(f"{nickname} ({qq})" if nickname else f"QQ {qq}")
         if hidden_count:
             lines.append(f"{'另有 ' if public_ids else ''}{hidden_count} 只在线未公开 QQ")
         sections.append("\n".join(lines))
