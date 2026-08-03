@@ -44,6 +44,7 @@ from .bot_monitor import (
     list_connected_bots_in_group,
     offline_bots,
 )
+from .list_mode import format_federate_status_rosters
 from .mail_notifier import (
     handle_offline_mail_command,
     handle_test_mail_command,
@@ -309,6 +310,17 @@ async def handle_bot_status(bot: Bot, event: MessageEvent) -> None:
             return
         await refresh_command_cooldown(event, "bot_status.status")
 
+    from pallas.api.platform import (
+        federate_ingress_active,
+        get_federate_bot_rosters,
+        sync_federate_peer_bot_roster,
+    )
+
+    if federate_ingress_active():
+        await sync_federate_peer_bot_roster()
+        message = format_federate_status_rosters(await get_federate_bot_rosters())
+        await bot_status_cmd.finish(message or "暂无在线牛牛")
+
     # 获取牛牛状态信息
     online_bots, offline_bots_filtered = await get_bot_status_info()
 
@@ -342,7 +354,9 @@ async def handle_bot_count(bot: Bot, event: MessageEvent) -> None:
     if not isinstance(event, GroupMessageEvent):
         await bot_count_cmd.finish("牛牛报数仅支持群聊中使用")
 
-    if shard_ctx.sharding_active():
+    from pallas.api.platform import federate_ingress_active
+
+    if shard_ctx.sharding_active() or federate_ingress_active():
         from .shard_count import handle_shard_bot_count
 
         await handle_shard_bot_count(bot, event, finish=bot_count_cmd.finish)
