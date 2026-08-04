@@ -45,7 +45,7 @@ from .bot_monitor import (
     list_connected_bots_in_group,
     offline_bots,
 )
-from .list_mode import format_federate_status_rosters
+from .list_mode import format_federate_status_rosters, format_local_status
 from .mail_notifier import (
     handle_offline_mail_command,
     handle_test_mail_command,
@@ -71,6 +71,7 @@ __plugin_meta__ = PluginMetadata(
         "menu_template": PLUGIN_MENU_TEMPLATE,
         "exact_plaintexts": [
             "牛牛在吗",
+            "我的牛牛",
             "测试邮件",
             "离线邮件",
             "牛牛报数",
@@ -115,6 +116,13 @@ __plugin_meta__ = PluginMetadata(
             "plaintexts": ["牛牛报数", "牛牛出列"],
             "normalize_trailing_punct": True,
         },
+        "ingress_fanout_additional": [
+            {
+                "scope": "always",
+                "plaintexts": ["我的牛牛"],
+                "normalize_trailing_punct": True,
+            },
+        ],
         "menu_data": [
             {
                 "func": "牛牛在吗",
@@ -127,6 +135,15 @@ __plugin_meta__ = PluginMetadata(
                     "列出当前在线和离线的牛牛；名册范围可按配置决定是看本机、协议端登记还是更大范围。"
                     "如果离线太久，还会按配置触发邮件提醒。"
                 ),
+            },
+            {
+                "func": "我的牛牛",
+                "trigger_method": "on_cmd",
+                "trigger_scene": SCENE_BOTH,
+                "trigger_condition": "我的牛牛",
+                "command_permission": "bot_status.status",
+                "brief_des": "查看本机在线情况",
+                "detail_des": "只列出当前部署的牛牛；同一部署由一只牛牛统一回复。",
             },
             {
                 "func": "发送测试邮件",
@@ -199,6 +216,12 @@ COUNT_COOLDOWN_KEY: str = "bot_count"
 offline_notice = on_notice(priority=5, block=False)
 bot_status_cmd = on_command(
     "牛牛在吗",
+    permission=permission_for_command("bot_status.status"),
+    priority=5,
+    block=True,
+)
+local_bot_status_cmd = on_command(
+    "我的牛牛",
     permission=permission_for_command("bot_status.status"),
     priority=5,
     block=True,
@@ -314,55 +337,39 @@ async def handle_bot_status(bot: Bot, event: MessageEvent) -> None:
     from pallas.api.platform import (
         federate_ingress_active,
         get_federate_bot_rosters,
-        sync_federate_peer_bot_roster,
     )
 
     if federate_ingress_active():
-        await sync_federate_peer_bot_roster()
         rosters = await get_federate_bot_rosters()
-        public_online_ids = sorted(
-            qq
-            for roster in rosters
-            if roster.online_bot_ids is not None
-            for qq in roster.online_bot_ids & roster.public_bot_ids
-        )
-        nickname_results = await asyncio.gather(
-            *(get_bot_nickname(qq) for qq in public_online_ids),
-            return_exceptions=True,
-        )
-        nicknames_by_id = {
-            qq: nickname
-            for qq, nickname in zip(public_online_ids, nickname_results, strict=True)
-            if isinstance(nickname, str) and nickname.strip()
-        }
-        message = format_federate_status_rosters(rosters, nicknames_by_id=nicknames_by_id)
+        message = format_federate_status_rosters(rosters)
         await bot_status_cmd.finish(message or "暂无在线牛牛")
 
-    # 获取牛牛状态信息
     online_bots, offline_bots_filtered = await get_bot_status_info()
+    await bot_status_cmd.finish(format_local_status(online_bots, offline_bots_filtered))
 
-    # 显示在线牛牛
-    online_info: str = ""
-    online_count: int = len(online_bots)
-    if online_bots:
-        bot_info_list: list[str] = [f"{nickname} ({bot_id})" for bot_id, nickname in online_bots.items()]
-        online_info = f"在线的牛牛 (Total: {online_count}):\n" + "\n".join(bot_info_list)
-    else:
-        online_info = ""
 
-    # 显示离线牛牛
-    offline_info: str = ""
-    offline_count: int = len(offline_bots_filtered)
-    if offline_bots_filtered:
-        offline_list: list[str] = [f"{nickname} ({bot_id})" for bot_id, nickname in offline_bots_filtered.items()]
-        offline_info = f"\n\n离线的牛牛 (Total: {offline_count}):\n" + "\n".join(offline_list)
+@local_bot_status_cmd.handle()
+async def handle_local_bot_status(bot: Bot, event: MessageEvent) -> None:
+    """处理仅本部署展示的牛牛状态。"""
+    if isinstance(event, GroupMessageEvent):
+        from pallas.api.platform import claim_group_handler
 
-    if offline_info:
-        message: str = online_info + offline_info
-    else:
-        message = online_info
+        try:
+            from pallas.api.platform import local_deployment_claim_plugin
+        except ImportError:
+            from pallas.product.community_stats.store import load_or_create_deployment_id
 
-    await bot_status_cmd.finish(message)
+            claim_plugin = f"bot_status:deployment:{load_or_create_deployment_id()}"
+        else:
+            claim_plugin = local_deployment_claim_plugin("bot_status")
+        if not await claim_group_handler(claim_plugin, event, int(bot.self_id)):
+            return
+        if not await is_command_cooldown_ready(event, "bot_status.status"):
+            return
+        await refresh_command_cooldown(event, "bot_status.status")
+
+    online_bots, offline_bots_filtered = await get_bot_status_info()
+    await local_bot_status_cmd.finish(format_local_status(online_bots, offline_bots_filtered))
 
 
 @bot_count_cmd.handle()
