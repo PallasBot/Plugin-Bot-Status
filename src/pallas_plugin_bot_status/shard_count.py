@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import asyncio
 import time
+from collections.abc import Awaitable, Callable
 from typing import TYPE_CHECKING
 
 from nonebot import logger
@@ -23,17 +24,45 @@ from pallas.api.platform_fleet_probe import list_local_fleet_bots_in_group
 from pallas.core.platform.shard import context as shard_ctx
 
 if TYPE_CHECKING:
-    from collections.abc import Awaitable, Callable
-
     from nonebot.adapters.onebot.v11 import Bot, GroupMessageEvent
+
+
+BotCountWork = Callable[[], Awaitable[None]]
+bot_count_tasks: dict[int, asyncio.Task[None]] = {}
+
+
+def start_background_bot_count(group_id: int, work: BotCountWork) -> bool:
+    """同一部署内每群只允许一个报数任务，避免新一轮插入当前报数。"""
+    current = bot_count_tasks.get(group_id)
+    if current is not None and not current.done():
+        return False
+
+    task = asyncio.create_task(work(), name=f"bot_count:{group_id}")
+    bot_count_tasks[group_id] = task
+
+    def clear_completed_task(done_task: asyncio.Task[None]) -> None:
+        if bot_count_tasks.get(group_id) is done_task:
+            bot_count_tasks.pop(group_id, None)
+        if done_task.cancelled():
+            return
+        try:
+            done_task.result()
+        except Exception as exc:
+            logger.exception("bot_count: background task failed group={}: {}", group_id, exc)
+
+    task.add_done_callback(clear_completed_task)
+    return True
 
 
 async def handle_shard_bot_count(
     bot: Bot,
     event: GroupMessageEvent,
-    *,
-    finish: Callable[[str], Awaitable[None]],
-) -> None:
+) -> bool:
+    """启动后台协调报数，使 matcher 及时释放同群会话队列。"""
+    return start_background_bot_count(event.group_id, lambda: run_shard_bot_count(bot, event))
+
+
+async def run_shard_bot_count(bot: Bot, event: GroupMessageEvent) -> None:
     self_id = int(bot.self_id)
     plain = (event.get_plaintext() or "").strip()
     local_ids = [self_id]
@@ -114,7 +143,7 @@ async def handle_shard_bot_count(
                 bot_id=bot_id,
             ):
                 await asyncio.sleep(0.3)
-                await finish("牛牛们报数完毕！")
+                await send_group_message_as_bot(last_sent_bot_id, event.group_id, "牛牛们报数完毕！")
                 return
         if last_sent_bot_id is not None:
             await asyncio.sleep((len(order) - last_sent_index) * STAGGER_SEC + 0.8)
@@ -126,7 +155,7 @@ async def handle_shard_bot_count(
                 bot_id=last_sent_bot_id,
             ):
                 await asyncio.sleep(0.3)
-                await finish("牛牛们报数完毕！")
+                await send_group_message_as_bot(last_sent_bot_id, event.group_id, "牛牛们报数完毕！")
         return
     index, total = coord
     await asyncio.sleep((index - 1) * STAGGER_SEC)
@@ -153,4 +182,7 @@ async def handle_shard_bot_count(
         )
     if claimed_completion:
         await asyncio.sleep(0.3)
-        await finish("牛牛们报数完毕！")
+        try:
+            await bot.send_group_msg(group_id=event.group_id, message="牛牛们报数完毕！")
+        except Exception as e:
+            logger.warning(f"bot [{self_id}] shard bot_count completion failed in group [{event.group_id}]: {e}")

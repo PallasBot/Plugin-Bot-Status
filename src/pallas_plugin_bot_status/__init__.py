@@ -383,9 +383,16 @@ async def handle_bot_count(bot: Bot, event: MessageEvent) -> None:
     if shard_ctx.sharding_active() or federate_ingress_active():
         from .shard_count import handle_shard_bot_count
 
-        await handle_shard_bot_count(bot, event, finish=bot_count_cmd.finish)
+        await handle_shard_bot_count(bot, event)
         return
 
+    from .shard_count import start_background_bot_count
+
+    start_background_bot_count(event.group_id, lambda: run_local_bot_count(bot, event))
+
+
+async def run_local_bot_count(bot: Bot, event: GroupMessageEvent) -> None:
+    """本机模式的后台报数，完成语由最后成功报数的牛牛发送。"""
     group_bot_ids = await list_connected_bots_in_group(event.group_id)
     if not group_bot_ids:
         return
@@ -397,12 +404,14 @@ async def handle_bot_count(bot: Bot, event: MessageEvent) -> None:
     seed_text = f"{datetime.now().strftime('%Y-%m-%d')}:{event.group_id}"
     random.Random(seed_text).shuffle(group_bot_ids)
     failed_bots: list[int] = []
+    last_reporting_bot: Bot | None = None
     current_bots = get_bots()
 
     for index, bot_id in enumerate(group_bot_ids, start=1):
         bot_instance = current_bots[str(bot_id)]
         try:
             await bot_instance.send_group_msg(group_id=event.group_id, message=str(f"牛牛{index}号报到！"))
+            last_reporting_bot = bot_instance
             await asyncio.sleep(0.3)
         except Exception as e:
             logger.warning(f"bot [{bot_id}] bot_count send_group_msg failed in group [{event.group_id}]: {e}")
@@ -411,6 +420,12 @@ async def handle_bot_count(bot: Bot, event: MessageEvent) -> None:
     if failed_bots:
         online_bots, _ = await get_bot_status_info()
         failed_text = "、".join(online_bots.get(bot_id, str(bot_id)) for bot_id in failed_bots)
-        await bot_count_cmd.finish(f"报数完成，以下牛牛没能报数：{failed_text}")
+        completion = f"报数完成，以下牛牛没能报数：{failed_text}"
+    else:
+        completion = "牛牛们报数完毕！"
 
-    await bot_count_cmd.finish("牛牛们报数完毕！")
+    sender = last_reporting_bot or bot
+    try:
+        await sender.send_group_msg(group_id=event.group_id, message=completion)
+    except Exception as e:
+        logger.warning(f"bot_count completion send failed in group [{event.group_id}]: {e}")
