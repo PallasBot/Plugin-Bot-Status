@@ -4,13 +4,17 @@ from __future__ import annotations
 
 import asyncio
 import contextlib
+import time
 from typing import TYPE_CHECKING
 
 from nonebot import logger
 from pallas.api.platform import (
+    NS_LOCAL_CONNECTED,
     STAGGER_SEC,
+    clear_group_online_cache,
     get_shard_bot_count_order,
     mark_shard_bot_count_reported_and_claim_completion,
+    resolve_local_connected_bots_in_group,
     run_shard_coordinated_bot_count,
     send_group_message_as_bot,
     update_shard_bot_count_registration,
@@ -37,6 +41,10 @@ async def handle_shard_bot_count(
     if unified or shard_ctx.is_local_representative(self_id):
         probed = await list_local_fleet_bots_in_group(event.group_id)
         local_ids = sorted({self_id, *probed})
+    if unified:
+        clear_group_online_cache(NS_LOCAL_CONNECTED)
+        connected = await resolve_local_connected_bots_in_group(event.group_id)
+        local_ids = sorted({*local_ids, *connected})
 
     coord_task = asyncio.create_task(
         run_shard_coordinated_bot_count(
@@ -79,10 +87,12 @@ async def handle_shard_bot_count(
         local_ids_set = set(local_ids)
         last_sent_bot_id: int | None = None
         last_sent_index = 0
+        dispatch_started_at = time.monotonic()
         for index, bot_id in enumerate(order, start=1):
             if bot_id not in local_ids_set:
                 continue
-            await asyncio.sleep((index - 1) * STAGGER_SEC)
+            delay = (index - 1) * STAGGER_SEC - (time.monotonic() - dispatch_started_at)
+            await asyncio.sleep(max(0.0, delay))
             try:
                 await send_group_message_as_bot(bot_id, event.group_id, f"牛牛{index}号报到！")
             except Exception as e:

@@ -14,6 +14,9 @@ async def test_unified_handler_sends_for_all_local_bots(monkeypatch: pytest.Monk
     registrations: list[list[int]] = []
     finished: list[str] = []
     completion_claims: list[int] = []
+    resolved_groups: list[int] = []
+    sleep_calls: list[float] = []
+    clock = [0.0]
 
     class Bot:
         self_id = "100"
@@ -27,6 +30,10 @@ async def test_unified_handler_sends_for_all_local_bots(monkeypatch: pytest.Monk
             return "牛牛报数"
 
     async def list_local_bots(_group_id: int) -> list[int]:
+        return [100]
+
+    async def resolve_local_bots(group_id: int) -> list[int]:
+        resolved_groups.append(group_id)
         return [100, 300]
 
     async def run_coord(**_kwargs) -> tuple[int, int]:
@@ -40,6 +47,7 @@ async def test_unified_handler_sends_for_all_local_bots(monkeypatch: pytest.Monk
 
     async def send_as_bot(bot_id: int, group_id: int, message: str) -> None:
         sent.append((bot_id, group_id, message))
+        clock[0] += 0.2
 
     async def claim_completion(**kwargs) -> bool:
         completion_claims.append(kwargs["bot_id"])
@@ -48,25 +56,29 @@ async def test_unified_handler_sends_for_all_local_bots(monkeypatch: pytest.Monk
     async def finish(message: str) -> None:
         finished.append(message)
 
-    async def sleep(_seconds: float) -> None:
-        return None
+    async def sleep(seconds: float) -> None:
+        sleep_calls.append(seconds)
+        clock[0] += seconds
 
     monkeypatch.setattr(shard_count.shard_ctx, "sharding_active", lambda: False)
     monkeypatch.setattr(shard_count, "list_local_fleet_bots_in_group", list_local_bots)
+    monkeypatch.setattr(shard_count, "resolve_local_connected_bots_in_group", resolve_local_bots)
     monkeypatch.setattr(shard_count, "run_shard_coordinated_bot_count", run_coord)
     monkeypatch.setattr(shard_count, "update_shard_bot_count_registration", update_registration)
     monkeypatch.setattr(shard_count, "get_shard_bot_count_order", read_order)
     monkeypatch.setattr(shard_count, "send_group_message_as_bot", send_as_bot)
     monkeypatch.setattr(shard_count, "mark_shard_bot_count_reported_and_claim_completion", claim_completion)
     monkeypatch.setattr(shard_count.asyncio, "sleep", sleep)
-    monkeypatch.setattr(shard_count, "STAGGER_SEC", 0)
+    monkeypatch.setattr(shard_count.time, "monotonic", lambda: clock[0])
 
     await shard_count.handle_shard_bot_count(Bot(), Event(), finish=finish)
 
     assert registrations == [[100, 300]]
+    assert resolved_groups == [10086]
     assert sent == [
         (100, 10086, "牛牛2号报到！"),
         (300, 10086, "牛牛3号报到！"),
     ]
     assert completion_claims == [100, 300, 300]
+    assert sleep_calls == pytest.approx([0.35, 0.15, 0.8, 0.3])
     assert finished == ["牛牛们报数完毕！"]
