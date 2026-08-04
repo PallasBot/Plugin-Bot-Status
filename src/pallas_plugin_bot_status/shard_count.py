@@ -65,8 +65,6 @@ async def handle_shard_bot_count(
     if coord is None:
         return
     if unified:
-        if self_id != min(local_ids):
-            return
         order = await get_shard_bot_count_order(
             group_id=event.group_id,
             user_id=int(event.user_id),

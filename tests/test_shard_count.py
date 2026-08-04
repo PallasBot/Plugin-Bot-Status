@@ -47,6 +47,9 @@ async def test_unified_handler_sends_for_all_local_bots(monkeypatch: pytest.Monk
     async def read_order(**_kwargs) -> list[int]:
         return [200, 100, 300]
 
+    async def wait_turn(**_kwargs) -> bool:
+        return True
+
     async def send_as_bot(bot_id: int, group_id: int, message: str) -> bool:
         sent.append((bot_id, group_id, message))
         clock[0] += 0.2
@@ -69,6 +72,7 @@ async def test_unified_handler_sends_for_all_local_bots(monkeypatch: pytest.Monk
     monkeypatch.setattr(shard_count, "run_shard_coordinated_bot_count", run_coord)
     monkeypatch.setattr(shard_count, "update_shard_bot_count_registration", update_registration)
     monkeypatch.setattr(shard_count, "get_shard_bot_count_order", read_order)
+    monkeypatch.setattr(shard_count, "wait_shard_bot_count_turn", wait_turn)
     monkeypatch.setattr(shard_count, "send_group_message_as_bot", send_as_bot)
     monkeypatch.setattr(shard_count, "mark_shard_bot_count_reported_and_claim_completion", claim_completion)
     monkeypatch.setattr(shard_count.asyncio, "sleep", sleep)
@@ -88,7 +92,7 @@ async def test_unified_handler_sends_for_all_local_bots(monkeypatch: pytest.Monk
 
 
 @pytest.mark.asyncio
-async def test_unified_non_representative_does_not_proxy_the_full_count(monkeypatch: pytest.MonkeyPatch) -> None:
+async def test_unified_claim_winner_proxies_the_full_count(monkeypatch: pytest.MonkeyPatch) -> None:
     from pallas_plugin_bot_status import shard_count
 
     sent: list[int] = []
@@ -119,9 +123,21 @@ async def test_unified_non_representative_does_not_proxy_the_full_count(monkeypa
     async def read_order(**_kwargs) -> list[int]:
         return [100, 300]
 
+    async def wait_turn(**_kwargs) -> bool:
+        return True
+
     async def send_as_bot(bot_id: int, *_args) -> bool:
         sent.append(bot_id)
         return True
+
+    async def claim_completion(**kwargs) -> bool:
+        return kwargs["bot_id"] == 300
+
+    async def sleep(_seconds: float) -> None:
+        return None
+
+    async def finish(_message: str) -> None:
+        return None
 
     monkeypatch.setattr(shard_count.shard_ctx, "sharding_active", lambda: False)
     monkeypatch.setattr(shard_count, "list_local_fleet_bots_in_group", list_local_bots)
@@ -129,11 +145,14 @@ async def test_unified_non_representative_does_not_proxy_the_full_count(monkeypa
     monkeypatch.setattr(shard_count, "run_shard_coordinated_bot_count", run_coord)
     monkeypatch.setattr(shard_count, "update_shard_bot_count_registration", update_registration)
     monkeypatch.setattr(shard_count, "get_shard_bot_count_order", read_order)
+    monkeypatch.setattr(shard_count, "wait_shard_bot_count_turn", wait_turn)
     monkeypatch.setattr(shard_count, "send_group_message_as_bot", send_as_bot)
+    monkeypatch.setattr(shard_count, "mark_shard_bot_count_reported_and_claim_completion", claim_completion)
+    monkeypatch.setattr(shard_count.asyncio, "sleep", sleep)
 
-    await shard_count.handle_shard_bot_count(Bot(), Event(), finish=lambda _message: None)
+    await shard_count.handle_shard_bot_count(Bot(), Event(), finish=finish)
 
-    assert sent == []
+    assert sent == [100, 300]
 
 
 @pytest.mark.asyncio
@@ -171,6 +190,9 @@ async def test_unified_handler_registers_before_reading_coordination_state(
     async def read_order(**_kwargs) -> list[int]:
         return [100]
 
+    async def wait_turn(**_kwargs) -> bool:
+        return True
+
     async def send_as_bot(*_args) -> bool:
         return True
 
@@ -186,6 +208,7 @@ async def test_unified_handler_registers_before_reading_coordination_state(
     monkeypatch.setattr(shard_count, "update_shard_bot_count_registration", register)
     monkeypatch.setattr(shard_count, "run_shard_coordinated_bot_count", run_coord)
     monkeypatch.setattr(shard_count, "get_shard_bot_count_order", read_order)
+    monkeypatch.setattr(shard_count, "wait_shard_bot_count_turn", wait_turn)
     monkeypatch.setattr(shard_count, "send_group_message_as_bot", send_as_bot)
     monkeypatch.setattr(shard_count, "mark_shard_bot_count_reported_and_claim_completion", claim_completion)
 
@@ -226,6 +249,9 @@ async def test_unified_handler_does_not_count_unsent_bot_as_reported(monkeypatch
     async def read_order(**_kwargs) -> list[int]:
         return [100]
 
+    async def wait_turn(**_kwargs) -> bool:
+        return True
+
     async def send_as_bot(*_args) -> bool:
         return False
 
@@ -239,6 +265,7 @@ async def test_unified_handler_does_not_count_unsent_bot_as_reported(monkeypatch
     monkeypatch.setattr(shard_count, "run_shard_coordinated_bot_count", run_coord)
     monkeypatch.setattr(shard_count, "update_shard_bot_count_registration", update_registration)
     monkeypatch.setattr(shard_count, "get_shard_bot_count_order", read_order)
+    monkeypatch.setattr(shard_count, "wait_shard_bot_count_turn", wait_turn)
     monkeypatch.setattr(shard_count, "send_group_message_as_bot", send_as_bot)
 
     async def sleep(_seconds: float) -> None:
