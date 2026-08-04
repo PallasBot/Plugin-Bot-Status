@@ -98,7 +98,7 @@ def format_federate_status_rosters(
         name = roster.deployment_name or f"部署 {deployment_id[:7]}"
         online_ids = roster.online_bot_ids
         if online_ids is None:
-            sections.append(f"{name}：状态未知（对端待升级）")
+            sections.append(f"{name}：在线状态暂不可用")
             continue
         if not online_ids:
             sections.append(f"{name}：暂无在线牛牛")

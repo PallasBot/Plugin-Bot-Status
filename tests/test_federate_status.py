@@ -28,6 +28,20 @@ def test_local_status_command_fans_out_to_each_deployment() -> None:
     ]
 
 
+def test_federate_status_summarizes_unavailable_peer_without_upgrade_prompt():
+    text = format_federate_status_rosters([
+        FederatePeerBotRoster(
+            deployment_id="dep-legacy",
+            deployment_name="旧部署",
+            bot_ids=frozenset({30001}),
+            online_bot_ids=None,
+            public_bot_ids=frozenset(),
+        ),
+    ])
+
+    assert text == "旧部署：在线状态暂不可用"
+
+
 def test_federate_status_lists_public_accounts_one_per_line():
     text = format_federate_status_rosters([
         FederatePeerBotRoster(
@@ -61,5 +75,5 @@ def test_federate_status_lists_public_accounts_one_per_line():
         "另有 1 只在线未公开 QQ\n\n"
         "部署 B：2只在线\n"
         "2 只在线未公开 QQ\n\n"
-        "部署 dep-leg：状态未知（对端待升级）"
+        "部署 dep-leg：在线状态暂不可用"
     )
