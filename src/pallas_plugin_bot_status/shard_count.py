@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 import asyncio
-import contextlib
 import time
 from typing import TYPE_CHECKING
 
@@ -47,33 +46,22 @@ async def handle_shard_bot_count(
         connected = await resolve_local_connected_bots_in_group(event.group_id)
         local_ids = sorted({*local_ids, *connected})
 
-    coord_task = asyncio.create_task(
-        run_shard_coordinated_bot_count(
+    if (unified or shard_ctx.is_local_representative(self_id)) and local_ids:
+        await update_shard_bot_count_registration(
             group_id=event.group_id,
             user_id=int(event.user_id),
             plaintext=plain,
             message_time=event.time,
-            self_bot_id=self_id,
-            local_bot_ids=local_ids,
+            bot_ids=local_ids,
         )
+    coord = await run_shard_coordinated_bot_count(
+        group_id=event.group_id,
+        user_id=int(event.user_id),
+        plaintext=plain,
+        message_time=event.time,
+        self_bot_id=self_id,
+        local_bot_ids=local_ids,
     )
-    try:
-        if (unified or shard_ctx.is_local_representative(self_id)) and local_ids:
-            await update_shard_bot_count_registration(
-                group_id=event.group_id,
-                user_id=int(event.user_id),
-                plaintext=plain,
-                message_time=event.time,
-                bot_ids=local_ids,
-            )
-        coord = await coord_task
-    except asyncio.CancelledError:
-        raise
-    finally:
-        if not coord_task.done():
-            coord_task.cancel()
-            with contextlib.suppress(asyncio.CancelledError):
-                await coord_task
     if coord is None:
         return
     if unified:
