@@ -9,7 +9,10 @@ from typing import TYPE_CHECKING
 from nonebot import logger
 from pallas.api.platform import (
     STAGGER_SEC,
+    get_shard_bot_count_order,
+    mark_shard_bot_count_reported_and_claim_completion,
     run_shard_coordinated_bot_count,
+    send_group_message_as_bot,
     update_shard_bot_count_registration,
 )
 from pallas.api.platform_fleet_probe import list_local_fleet_bots_in_group
@@ -30,7 +33,8 @@ async def handle_shard_bot_count(
     self_id = int(bot.self_id)
     plain = (event.get_plaintext() or "").strip()
     local_ids = [self_id]
-    if shard_ctx.is_local_representative(self_id):
+    unified = not shard_ctx.sharding_active()
+    if unified or shard_ctx.is_local_representative(self_id):
         probed = await list_local_fleet_bots_in_group(event.group_id)
         local_ids = sorted({self_id, *probed})
 
@@ -45,7 +49,7 @@ async def handle_shard_bot_count(
         )
     )
     try:
-        if shard_ctx.is_local_representative(self_id) and local_ids:
+        if (unified or shard_ctx.is_local_representative(self_id)) and local_ids:
             await update_shard_bot_count_registration(
                 group_id=event.group_id,
                 user_id=int(event.user_id),
@@ -63,6 +67,51 @@ async def handle_shard_bot_count(
                 await coord_task
     if coord is None:
         return
+    if unified:
+        order = await get_shard_bot_count_order(
+            group_id=event.group_id,
+            user_id=int(event.user_id),
+            plaintext=plain,
+            message_time=event.time,
+        )
+        if not order:
+            return
+        local_ids_set = set(local_ids)
+        last_sent_bot_id: int | None = None
+        last_sent_index = 0
+        for index, bot_id in enumerate(order, start=1):
+            if bot_id not in local_ids_set:
+                continue
+            await asyncio.sleep((index - 1) * STAGGER_SEC)
+            try:
+                await send_group_message_as_bot(bot_id, event.group_id, f"牛牛{index}号报到！")
+            except Exception as e:
+                logger.warning(f"bot [{bot_id}] shard bot_count send failed in group [{event.group_id}]: {e}")
+                continue
+            last_sent_bot_id = bot_id
+            last_sent_index = index
+            if await mark_shard_bot_count_reported_and_claim_completion(
+                group_id=event.group_id,
+                user_id=int(event.user_id),
+                plaintext=plain,
+                message_time=event.time,
+                bot_id=bot_id,
+            ):
+                await asyncio.sleep(0.3)
+                await finish("牛牛们报数完毕！")
+                return
+        if last_sent_bot_id is not None:
+            await asyncio.sleep((len(order) - last_sent_index) * STAGGER_SEC + 0.8)
+            if await mark_shard_bot_count_reported_and_claim_completion(
+                group_id=event.group_id,
+                user_id=int(event.user_id),
+                plaintext=plain,
+                message_time=event.time,
+                bot_id=last_sent_bot_id,
+            ):
+                await asyncio.sleep(0.3)
+                await finish("牛牛们报数完毕！")
+        return
     index, total = coord
     await asyncio.sleep((index - 1) * STAGGER_SEC)
     try:
@@ -70,6 +119,22 @@ async def handle_shard_bot_count(
     except Exception as e:
         logger.warning(f"bot [{self_id}] shard bot_count send failed in group [{event.group_id}]: {e}")
         return
-    if index == total:
+    claimed_completion = await mark_shard_bot_count_reported_and_claim_completion(
+        group_id=event.group_id,
+        user_id=int(event.user_id),
+        plaintext=plain,
+        message_time=event.time,
+        bot_id=self_id,
+    )
+    if not claimed_completion:
+        await asyncio.sleep((total - index) * STAGGER_SEC + 0.8)
+        claimed_completion = await mark_shard_bot_count_reported_and_claim_completion(
+            group_id=event.group_id,
+            user_id=int(event.user_id),
+            plaintext=plain,
+            message_time=event.time,
+            bot_id=self_id,
+        )
+    if claimed_completion:
         await asyncio.sleep(0.3)
         await finish("牛牛们报数完毕！")
