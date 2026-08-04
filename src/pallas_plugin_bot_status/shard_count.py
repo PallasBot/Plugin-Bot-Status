@@ -18,6 +18,7 @@ from pallas.api.platform import (
     run_shard_coordinated_bot_count,
     send_group_message_as_bot,
     update_shard_bot_count_registration,
+    wait_shard_bot_count_turn,
 )
 from pallas.api.platform_fleet_probe import list_local_fleet_bots_in_group
 from pallas.core.platform.shard import context as shard_ctx
@@ -76,6 +77,8 @@ async def handle_shard_bot_count(
     if coord is None:
         return
     if unified:
+        if self_id != min(local_ids):
+            return
         order = await get_shard_bot_count_order(
             group_id=event.group_id,
             user_id=int(event.user_id),
@@ -91,12 +94,29 @@ async def handle_shard_bot_count(
         for index, bot_id in enumerate(order, start=1):
             if bot_id not in local_ids_set:
                 continue
+            turn_ready = await wait_shard_bot_count_turn(
+                group_id=event.group_id,
+                user_id=int(event.user_id),
+                plaintext=plain,
+                message_time=event.time,
+                bot_id=bot_id,
+            )
+            if not turn_ready:
+                logger.debug(
+                    "bot_count: turn timeout group={} bot={} index={}",
+                    event.group_id,
+                    bot_id,
+                    index,
+                )
             delay = (index - 1) * STAGGER_SEC - (time.monotonic() - dispatch_started_at)
             await asyncio.sleep(max(0.0, delay))
             try:
-                await send_group_message_as_bot(bot_id, event.group_id, f"牛牛{index}号报到！")
+                sent = await send_group_message_as_bot(bot_id, event.group_id, f"牛牛{index}号报到！")
             except Exception as e:
                 logger.warning(f"bot [{bot_id}] shard bot_count send failed in group [{event.group_id}]: {e}")
+                continue
+            if not sent:
+                logger.warning(f"bot [{bot_id}] shard bot_count send was rejected in group [{event.group_id}]")
                 continue
             last_sent_bot_id = bot_id
             last_sent_index = index
