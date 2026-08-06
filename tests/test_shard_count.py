@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import asyncio
+from types import SimpleNamespace
 
 import nonebot
 import pytest
@@ -18,9 +19,13 @@ async def test_unified_runner_sends_completion_as_last_reporting_bot(monkeypatch
     resolved_groups: list[int] = []
     sleep_calls: list[float] = []
     clock = [0.0]
+    notices: list[tuple[int, str]] = []
 
     class Bot:
         self_id = "100"
+
+        async def send_group_msg(self, *, group_id: int, message: str) -> None:
+            notices.append((group_id, message))
 
     class Event:
         group_id = 10086
@@ -78,6 +83,7 @@ async def test_unified_runner_sends_completion_as_last_reporting_bot(monkeypatch
 
     assert registrations == [[100, 300]]
     assert resolved_groups == [10086]
+    assert notices == [(10086, "牛牛集合！")]
     assert sent == [
         (100, 10086, "牛牛2号报到！"),
         (300, 10086, "牛牛3号报到！"),
@@ -122,6 +128,52 @@ async def test_shard_handler_starts_one_background_task_per_group(monkeypatch: p
     assert await shard_count.handle_shard_bot_count(Bot(), Event())
     for task in tuple(shard_count.bot_count_tasks.values()):
         task.cancel()
+    await asyncio.sleep(0)
+
+
+@pytest.mark.asyncio
+async def test_shard_handler_registers_late_local_bot_for_active_count(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    from pallas_plugin_bot_status import shard_count
+
+    started = asyncio.Event()
+    release = asyncio.Event()
+    registrations: list[dict[str, object]] = []
+
+    class Event:
+        group_id = 10086
+        user_id = 20001
+        time = 30002
+
+        def get_plaintext(self) -> str:
+            return "牛牛报数"
+
+    async def run_count(_bot: object, _event: Event) -> None:
+        started.set()
+        await release.wait()
+
+    async def register(**kwargs: object) -> None:
+        registrations.append(kwargs)
+
+    monkeypatch.setattr(shard_count, "run_shard_bot_count", run_count)
+    monkeypatch.setattr(shard_count, "update_shard_bot_count_registration", register)
+
+    assert await shard_count.handle_shard_bot_count(SimpleNamespace(self_id="100"), Event())
+    await asyncio.wait_for(started.wait(), timeout=0.1)
+    assert not await shard_count.handle_shard_bot_count(SimpleNamespace(self_id="200"), Event())
+    assert registrations == [
+        {
+            "group_id": 10086,
+            "user_id": 20001,
+            "plaintext": "牛牛报数",
+            "message_time": 30002,
+            "bot_ids": [200],
+        }
+    ]
+
+    release.set()
+    await asyncio.sleep(0)
     await asyncio.sleep(0)
 
 

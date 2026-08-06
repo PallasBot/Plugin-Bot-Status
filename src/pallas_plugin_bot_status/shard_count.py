@@ -59,12 +59,26 @@ async def handle_shard_bot_count(
     event: GroupMessageEvent,
 ) -> bool:
     """启动后台协调报数，使 matcher 及时释放同群会话队列。"""
+    current = bot_count_tasks.get(event.group_id)
+    if current is not None and not current.done():
+        await update_shard_bot_count_registration(
+            group_id=event.group_id,
+            user_id=int(event.user_id),
+            plaintext=(event.get_plaintext() or "").strip(),
+            message_time=event.time,
+            bot_ids=[int(bot.self_id)],
+        )
+        return False
     return start_background_bot_count(event.group_id, lambda: run_shard_bot_count(bot, event))
 
 
 async def run_shard_bot_count(bot: Bot, event: GroupMessageEvent) -> None:
     self_id = int(bot.self_id)
     plain = (event.get_plaintext() or "").strip()
+    try:
+        await bot.send_group_msg(group_id=event.group_id, message="牛牛集合！")
+    except Exception as e:
+        logger.warning(f"bot [{self_id}] shard bot_count notice failed in group [{event.group_id}]: {e}")
     local_ids = [self_id]
     unified = not shard_ctx.sharding_active()
     if unified or shard_ctx.is_local_representative(self_id):
