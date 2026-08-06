@@ -129,6 +129,7 @@ async def run_shard_bot_count(bot: Bot, event: GroupMessageEvent) -> None:
                 plaintext=plain,
                 message_time=event.time,
                 bot_id=bot_id,
+                allow_timeout=False,
             )
             if not turn_ready:
                 logger.debug(
@@ -155,6 +156,7 @@ async def run_shard_bot_count(bot: Bot, event: GroupMessageEvent) -> None:
                 plaintext=plain,
                 message_time=event.time,
                 bot_id=bot_id,
+                allow_timeout=False,
             ):
                 await asyncio.sleep(0.3)
                 await send_group_message_as_bot(last_sent_bot_id, event.group_id, "牛牛们报数完毕！")
@@ -167,6 +169,7 @@ async def run_shard_bot_count(bot: Bot, event: GroupMessageEvent) -> None:
                 plaintext=plain,
                 message_time=event.time,
                 bot_id=last_sent_bot_id,
+                allow_timeout=True,
             ):
                 await asyncio.sleep(0.3)
                 await send_group_message_as_bot(last_sent_bot_id, event.group_id, "牛牛们报数完毕！")
@@ -184,6 +187,7 @@ async def run_shard_bot_count(bot: Bot, event: GroupMessageEvent) -> None:
         plaintext=plain,
         message_time=event.time,
         bot_id=self_id,
+        allow_timeout=False,
     )
     if not claimed_completion:
         await asyncio.sleep((total - index) * STAGGER_SEC + 0.8)
@@ -193,6 +197,7 @@ async def run_shard_bot_count(bot: Bot, event: GroupMessageEvent) -> None:
             plaintext=plain,
             message_time=event.time,
             bot_id=self_id,
+            allow_timeout=True,
         )
     if claimed_completion:
         await asyncio.sleep(0.3)

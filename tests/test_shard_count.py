@@ -15,7 +15,7 @@ async def test_unified_runner_sends_completion_as_last_reporting_bot(monkeypatch
 
     sent: list[tuple[int, int, str]] = []
     registrations: list[list[int]] = []
-    completion_claims: list[int] = []
+    completion_claims: list[tuple[int, bool]] = []
     resolved_groups: list[int] = []
     sleep_calls: list[float] = []
     clock = [0.0]
@@ -60,7 +60,7 @@ async def test_unified_runner_sends_completion_as_last_reporting_bot(monkeypatch
         return True
 
     async def claim_completion(**kwargs) -> bool:
-        completion_claims.append(kwargs["bot_id"])
+        completion_claims.append((kwargs["bot_id"], kwargs.get("allow_timeout", True)))
         return len(completion_claims) == 3
 
     async def sleep(seconds: float) -> None:
@@ -89,7 +89,7 @@ async def test_unified_runner_sends_completion_as_last_reporting_bot(monkeypatch
         (300, 10086, "牛牛3号报到！"),
         (300, 10086, "牛牛们报数完毕！"),
     ]
-    assert completion_claims == [100, 300, 300]
+    assert completion_claims == [(100, False), (300, False), (300, True)]
     assert sleep_calls == pytest.approx([0.35, 0.15, 0.8, 0.3])
 
 
