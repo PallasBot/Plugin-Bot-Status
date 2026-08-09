@@ -83,7 +83,7 @@ async def test_unified_runner_sends_completion_as_last_reporting_bot(monkeypatch
 
     assert registrations == [[100, 300]]
     assert resolved_groups == [10086]
-    assert notices == [(10086, "牛牛集合！")]
+    assert notices == []
     assert sent == [
         (100, 10086, "牛牛2号报到！"),
         (300, 10086, "牛牛3号报到！"),
@@ -182,9 +182,13 @@ async def test_unified_claim_winner_proxies_the_full_count(monkeypatch: pytest.M
     from pallas_plugin_bot_status import shard_count
 
     sent: list[int] = []
+    notices: list[tuple[int, str]] = []
 
     class Bot:
         self_id = "300"
+
+        async def send_group_msg(self, *, group_id: int, message: str) -> None:
+            notices.append((group_id, message))
 
     class Event:
         group_id = 10086
@@ -236,6 +240,7 @@ async def test_unified_claim_winner_proxies_the_full_count(monkeypatch: pytest.M
     await shard_count.run_shard_bot_count(Bot(), Event())
 
     assert sent == [100, 300, 300]
+    assert notices == []
 
 
 @pytest.mark.asyncio

@@ -75,10 +75,6 @@ async def handle_shard_bot_count(
 async def run_shard_bot_count(bot: Bot, event: GroupMessageEvent) -> None:
     self_id = int(bot.self_id)
     plain = (event.get_plaintext() or "").strip()
-    try:
-        await bot.send_group_msg(group_id=event.group_id, message="牛牛集合！")
-    except Exception as e:
-        logger.warning(f"bot [{self_id}] shard bot_count notice failed in group [{event.group_id}]: {e}")
     local_ids = [self_id]
     unified = not shard_ctx.sharding_active()
     if unified or shard_ctx.is_local_representative(self_id):
@@ -116,6 +112,11 @@ async def run_shard_bot_count(bot: Bot, event: GroupMessageEvent) -> None:
         )
         if not order:
             return
+        if order[0] == self_id:
+            try:
+                await bot.send_group_msg(group_id=event.group_id, message="牛牛集合！")
+            except Exception as e:
+                logger.warning(f"bot [{self_id}] shard bot_count notice failed in group [{event.group_id}]: {e}")
         local_ids_set = set(local_ids)
         last_sent_bot_id: int | None = None
         last_sent_index = 0
