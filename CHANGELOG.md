@@ -3,7 +3,7 @@
 本文件依据 git tag 历史整理，版本号遵循[语义化版本](https://semver.org/lang/zh-CN/)。
 新提交合入后请在 `## [Unreleased]` 下记录，发布时随版本 tag 归档。
 
-## [Unreleased]
+## [4.0.26] - 2026-08-10
 
 - 新增 `bot_status_show_other_deployments` 配置，关闭后「牛牛在吗」只展示当前部署。
 
