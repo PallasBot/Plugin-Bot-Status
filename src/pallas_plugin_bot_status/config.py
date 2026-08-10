@@ -21,6 +21,10 @@ class Config(BaseModel, extra="ignore"):
             "connected=全集群曾上线（不含仅登记未连过的号）。"
         ),
     )
+    bot_status_show_other_deployments: bool = Field(
+        default=True,
+        description="牛牛在吗是否展示联邦协同池中的其他部署；关闭后只展示当前部署。",
+    )
 
 
 plugin_webui = install_hot_reload_config(Config, config_module=__name__)

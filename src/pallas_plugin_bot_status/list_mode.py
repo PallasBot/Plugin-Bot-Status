@@ -19,8 +19,15 @@ if TYPE_CHECKING:
 
     from pallas.api.platform import FederatePeerBotRoster
 
+    from .config import Config
+
 StatusListMode = Literal["session", "fleet", "connected"]
 ResolvedListMode = StatusListMode
+
+
+def should_show_federate_status(*, federate_active: bool, config: Config | None = None) -> bool:
+    settings = config or get_bot_status_config()
+    return federate_active and settings.bot_status_show_other_deployments
 
 
 def resolve_status_list_mode() -> ResolvedListMode:

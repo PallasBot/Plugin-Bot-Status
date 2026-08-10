@@ -6,7 +6,28 @@ nonebot.init()
 
 from pallas.api.platform import FederatePeerBotRoster
 
-from pallas_plugin_bot_status.list_mode import format_federate_status_rosters
+from pallas_plugin_bot_status.config import Config
+from pallas_plugin_bot_status.list_mode import (
+    format_federate_status_rosters,
+    should_show_federate_status,
+)
+
+
+def test_other_deployments_are_shown_by_default() -> None:
+    config = Config()
+
+    assert config.bot_status_show_other_deployments is True
+    assert should_show_federate_status(federate_active=True, config=config) is True
+
+
+def test_other_deployments_can_be_hidden() -> None:
+    config = Config(bot_status_show_other_deployments=False)
+
+    assert should_show_federate_status(federate_active=True, config=config) is False
+
+
+def test_federate_status_is_hidden_when_federation_is_inactive() -> None:
+    assert should_show_federate_status(federate_active=False, config=Config()) is False
 
 
 def test_local_status_command_fans_out_to_each_deployment() -> None:

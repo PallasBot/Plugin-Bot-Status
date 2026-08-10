@@ -45,7 +45,11 @@ from .bot_monitor import (
     list_connected_bots_in_group,
     offline_bots,
 )
-from .list_mode import format_federate_status_rosters, format_local_status
+from .list_mode import (
+    format_federate_status_rosters,
+    format_local_status,
+    should_show_federate_status,
+)
 from .mail_notifier import (
     handle_offline_mail_command,
     handle_test_mail_command,
@@ -339,7 +343,7 @@ async def handle_bot_status(bot: Bot, event: MessageEvent) -> None:
         get_federate_bot_rosters,
     )
 
-    if federate_ingress_active():
+    if should_show_federate_status(federate_active=federate_ingress_active()):
         rosters = await get_federate_bot_rosters()
         message = format_federate_status_rosters(rosters)
         await bot_status_cmd.finish(message or "暂无在线牛牛")
