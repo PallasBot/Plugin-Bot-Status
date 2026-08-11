@@ -189,7 +189,7 @@ async def notify_bot_offline(bot_id: int, nickname: str, offline_reason: str = "
             logger.info(
                 format_plugin_event(
                     "offline_mail",
-                    f"Bot [{bot_id}] sent an offline notification mail (notice_email)",
+                    f"Bot [{bot_id}] sent an offline notification mail, target [notice_email]",
                 )
             )
 

@@ -281,7 +281,7 @@ async def handle_bot_offline_events(event: NoticeEvent):
         logger.warning(
             format_plugin_event(
                 "bot_offline",
-                f"Bot [{bot_id}] went offline (napcat) message={offline_message!r}",
+                f"Bot [{bot_id}] went offline, source [napcat], message {offline_message!r}",
             )
         )
 
@@ -289,7 +289,7 @@ async def handle_bot_offline_events(event: NoticeEvent):
         bot_id = getattr(event, "self_id", getattr(event, "user_id", 0))
         offline_message = "Bot Offline"
         source = "lagrange_event"
-        logger.warning(format_plugin_event("bot_offline", f"Bot [{bot_id}] went offline (lagrange)"))
+        logger.warning(format_plugin_event("bot_offline", f"Bot [{bot_id}] went offline, source [lagrange]"))
 
     if bot_id and source:
         from .bot_monitor import get_bot_nickname
