@@ -22,6 +22,7 @@ from pallas.api.limits import (
     is_command_cooldown_ready,
     refresh_command_cooldown,
 )
+from pallas.api.logging import format_plugin_event
 from pallas.api.metadata import (
     PLUGIN_EXTRA_VERSION,
     PLUGIN_HOMEPAGE,
@@ -277,13 +278,18 @@ async def handle_bot_offline_events(event: NoticeEvent):
         bot_id = event.user_id
         offline_message = getattr(event, "message", "")
         source = "napcat_event"
-        logger.warning(f"bot [{bot_id}] offline (napcat) message={offline_message!r}")
+        logger.warning(
+            format_plugin_event(
+                "bot_offline",
+                f"Bot [{bot_id}] went offline (napcat) message={offline_message!r}",
+            )
+        )
 
     elif hasattr(event, "sub_type") and event.sub_type == "BotOfflineEvent":  # Lagrange
         bot_id = getattr(event, "self_id", getattr(event, "user_id", 0))
         offline_message = "Bot Offline"
         source = "lagrange_event"
-        logger.warning(f"bot [{bot_id}] offline (lagrange)")
+        logger.warning(format_plugin_event("bot_offline", f"Bot [{bot_id}] went offline (lagrange)"))
 
     if bot_id and source:
         from .bot_monitor import get_bot_nickname

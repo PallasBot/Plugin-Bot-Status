@@ -7,6 +7,7 @@ from nonebot.adapters.onebot.v11 import GroupMessageEvent, Message, MessageEvent
 from nonebot.matcher import Matcher
 from nonebot.params import CommandArg
 from pallas.api.config import get_bot_admins
+from pallas.api.logging import format_plugin_event
 from pallas.api.utils import build_mail_config, get_smtp_config, send_mail
 
 from .bot_monitor import get_bot_status_info
@@ -151,7 +152,12 @@ async def notify_bot_offline_to_owners(
         else:
             sent += 1
             notified_owner_ids.append(owner_id)
-            logger.info(f"bot [{bot_id}] offline mail sent to owner [{owner_id}@qq.com]")
+            logger.info(
+                format_plugin_event(
+                    "offline_mail",
+                    f"Bot [{bot_id}] sent an offline notification mail to owner [{owner_id}@qq.com]",
+                )
+            )
         if len(owner_ids) > 1:
             await asyncio.sleep(OFFLINE_MAIL_SEND_INTERVAL_SEC)
 
@@ -180,7 +186,12 @@ async def notify_bot_offline(bot_id: int, nickname: str, offline_reason: str = "
         if result:
             logger.error(f"bot [{bot_id}] offline notification mail failed: {result}")
         else:
-            logger.info(f"bot [{bot_id}] offline notification mail sent (notice_email)")
+            logger.info(
+                format_plugin_event(
+                    "offline_mail",
+                    f"Bot [{bot_id}] sent an offline notification mail (notice_email)",
+                )
+            )
 
         for email in admin_emails:
             try:
@@ -189,7 +200,12 @@ async def notify_bot_offline(bot_id: int, nickname: str, offline_reason: str = "
                 if result:
                     logger.error(f"bot [{bot_id}] offline mail to admin [{email}] failed: {result}")
                 else:
-                    logger.info(f"bot [{bot_id}] offline notification mail sent to admin [{email}]")
+                    logger.info(
+                        format_plugin_event(
+                            "offline_mail",
+                            f"Bot [{bot_id}] sent an offline notification mail to admin [{email}]",
+                        )
+                    )
             except Exception as e:
                 logger.error(f"bot [{bot_id}] offline mail to admin [{email}] exception: {e}")
     else:

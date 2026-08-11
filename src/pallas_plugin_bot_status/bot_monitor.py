@@ -4,6 +4,7 @@ from datetime import datetime, timedelta
 from nonebot import get_bots, logger
 from nonebot.adapters.onebot.v11 import Bot
 from nonebot_plugin_apscheduler import scheduler
+from pallas.api.logging import format_plugin_event
 
 from .config import get_bot_status_config
 from .list_mode import (
@@ -127,7 +128,12 @@ async def check_bot_still_offline(bot_id: int, nickname: str) -> None:
 
     bots = get_bots()
     if str(bot_id) not in bots:
-        logger.warning(f"bot [{bot_id}] still offline after grace, sending notification")
+        logger.warning(
+            format_plugin_event(
+                "bot_offline",
+                f"Bot [{bot_id}] went offline after grace and sent notification",
+            )
+        )
         # 更新离线时间
         if bot_id in offline_bots:
             offline_bots[bot_id]["offline_time"] = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
