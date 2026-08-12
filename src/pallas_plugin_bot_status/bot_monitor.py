@@ -18,6 +18,18 @@ offline_bots: dict[int, dict[str, str]] = {}
 STATUS_COOLDOWN_KEY: str = "bot_status"
 
 
+def shutdown_in_progress() -> bool:
+    """进程正在收尾（Ctrl+C 等）时，跳过断连处理，避免刷屏与拖慢退出。"""
+    try:
+        from pallas.api.platform import is_process_shutting_down
+    except Exception:
+        return False
+    try:
+        return bool(is_process_shutting_down())
+    except Exception:
+        return False
+
+
 def protocol_offline_marked(bot_id: int) -> bool:
     """协议端/断线流程已记入 offline_bots（含宽限待确认）。"""
     rec = offline_bots.get(bot_id)
@@ -109,6 +121,9 @@ async def handle_bot_connect(bot: Bot) -> None:
 
 async def handle_bot_disconnect(bot: Bot) -> None:
     bot_id: int = int(bot.self_id)
+    if shutdown_in_progress():
+        logger.debug(f"bot [{bot_id}] skipped disconnect handling during shutdown")
+        return
     if bot_id in offline_bots and "source" in offline_bots[bot_id]:
         # 已经处理过了，直接返回
         return
@@ -153,6 +168,8 @@ async def handle_bot_disconnect(bot: Bot) -> None:
 
 async def check_bot_still_offline(bot_id: int, nickname: str) -> None:
     """检查牛牛是否真的离线"""
+    if shutdown_in_progress():
+        return
     if bot_id in cluster_online_bot_ids():
         if (
             bot_id in offline_bots

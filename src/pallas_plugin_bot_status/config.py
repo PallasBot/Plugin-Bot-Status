@@ -14,8 +14,8 @@ class Config(BaseModel, extra="ignore"):
     )
     bot_status_offline_grace_time: int = Field(
         default=30,
-        description="判定为离线并发送邮件通知前，允许无心跳的宽限时间（分钟）。",
-        json_schema_extra={"label": "离线宽限（分钟）"},
+        description="判定为离线并发送邮件通知前，允许无心跳的宽限时间（秒）。",
+        json_schema_extra={"label": "离线宽限（秒）"},
     )
     bot_status_list_mode: StatusListModeSetting = Field(
         default="auto",

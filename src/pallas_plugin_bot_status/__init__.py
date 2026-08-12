@@ -267,6 +267,10 @@ async def _(bot: Bot) -> None:
 @offline_notice.handle()
 async def handle_bot_offline_events(event: NoticeEvent):
     """协议端离线事件"""
+    from .bot_monitor import shutdown_in_progress
+
+    if shutdown_in_progress():
+        return
     if event.notice_type == "group_msg_emoji_like":
         return
 
