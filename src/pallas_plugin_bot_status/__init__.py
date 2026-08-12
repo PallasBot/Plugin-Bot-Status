@@ -339,6 +339,21 @@ async def _(bot: Bot, event: MessageEvent, args: Message = CommandArg()) -> None
 @bot_status_cmd.handle()
 async def handle_bot_status(bot: Bot, event: MessageEvent) -> None:
     """处理状态查询命令"""
+    import time
+
+    started = time.monotonic()
+
+    def _log_done(mode: str) -> None:
+        logger.info(
+            format_plugin_event(
+                "status_answered",
+                (
+                    f"Bot status answered via [{mode}] for user [{event.get_user_id()}] "
+                    f"in group [{getattr(event, 'group_id', None)}], took {(time.monotonic() - started) * 1000:.0f}ms"
+                ),
+            )
+        )
+
     if isinstance(event, GroupMessageEvent):
         if not await is_command_cooldown_ready(event, "bot_status.status"):
             return
@@ -352,15 +367,20 @@ async def handle_bot_status(bot: Bot, event: MessageEvent) -> None:
     if should_show_federate_status(federate_active=federate_ingress_active()):
         rosters = await get_federate_bot_rosters()
         message = format_federate_status_rosters(rosters)
+        _log_done("federate")
         await bot_status_cmd.finish(message or "暂无在线牛牛")
 
     online_bots, offline_bots_filtered = await get_bot_status_info()
+    _log_done("local")
     await bot_status_cmd.finish(format_local_status(online_bots, offline_bots_filtered))
 
 
 @local_bot_status_cmd.handle()
 async def handle_local_bot_status(bot: Bot, event: MessageEvent) -> None:
     """处理仅本部署展示的牛牛状态。"""
+    import time
+
+    started = time.monotonic()
     if isinstance(event, GroupMessageEvent):
         from pallas.api.platform import claim_group_handler
 
@@ -379,6 +399,15 @@ async def handle_local_bot_status(bot: Bot, event: MessageEvent) -> None:
         await refresh_command_cooldown(event, "bot_status.status")
 
     online_bots, offline_bots_filtered = await get_bot_status_info()
+    logger.info(
+        format_plugin_event(
+            "status_answered",
+            (
+                f"Local bot status answered for user [{event.get_user_id()}] "
+                f"in group [{getattr(event, 'group_id', None)}], took {(time.monotonic() - started) * 1000:.0f}ms"
+            ),
+        )
+    )
     await local_bot_status_cmd.finish(format_local_status(online_bots, offline_bots_filtered))
 
 

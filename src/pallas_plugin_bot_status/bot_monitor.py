@@ -29,6 +29,26 @@ def cluster_online_bot_ids(current_bots: dict | None = None) -> set[int]:
     return cluster_online_bot_ids_for_status(current_bots)
 
 
+_NICKNAME_QUERY_TIMEOUT_SEC = 3.0
+
+
+def _nickname_query_timeout_sec() -> float:
+    from .config import get_bot_status_config
+
+    try:
+        return float(get_bot_status_config().bot_status_nickname_query_timeout_sec or _NICKNAME_QUERY_TIMEOUT_SEC)
+    except Exception:
+        return _NICKNAME_QUERY_TIMEOUT_SEC
+
+
+async def _query_stranger_info(bot_instance, user_id: int) -> dict:
+    """带超时查询陌生人信息，避免对离线/无响应 bot 卡住整个状态查询。"""
+    return await asyncio.wait_for(
+        bot_instance.call_api("get_stranger_info", user_id=user_id),
+        timeout=_nickname_query_timeout_sec(),
+    )
+
+
 async def get_bot_nickname(bot_id: int, current_bots: dict = None) -> str:
     """获取牛牛昵称"""
     nickname: str = "Unknown Nickname"
@@ -38,7 +58,7 @@ async def get_bot_nickname(bot_id: int, current_bots: dict = None) -> str:
         # 首先尝试让牛牛自己获取自己的信息
         if str(bot_id) in bots:
             try:
-                info = await bots[str(bot_id)].call_api("get_stranger_info", user_id=bot_id)
+                info = await _query_stranger_info(bots[str(bot_id)], bot_id)
                 nickname = info.get("nickname", "Unknown Nickname")
                 if nickname != "Unknown Nickname":
                     return nickname
@@ -54,7 +74,7 @@ async def get_bot_nickname(bot_id: int, current_bots: dict = None) -> str:
 
             for bot_instance in available_bots:
                 try:
-                    info = await bot_instance.call_api("get_stranger_info", user_id=bot_id)
+                    info = await _query_stranger_info(bot_instance, bot_id)
                     nickname = info.get("nickname", "Unknown Nickname")
                     if nickname != "Unknown Nickname":
                         return nickname
@@ -76,7 +96,15 @@ async def get_bot_nickname(bot_id: int, current_bots: dict = None) -> str:
 
 async def handle_bot_connect(bot: Bot) -> None:
     bot_id: int = int(bot.self_id)
+    was_offline = bot_id in offline_bots
     offline_bots.pop(bot_id, None)
+    if was_offline:
+        logger.info(
+            format_plugin_event(
+                "bot_online",
+                f"Bot [{bot_id}] reconnected and cleared offline mark",
+            )
+        )
 
 
 async def handle_bot_disconnect(bot: Bot) -> None:
@@ -98,7 +126,15 @@ async def handle_bot_disconnect(bot: Bot) -> None:
         scheduler.remove_job(job_id)
 
     # 计算运行时间
-    run_time: datetime = datetime.now() + timedelta(seconds=get_bot_status_config().bot_status_offline_grace_time)
+    grace_sec = get_bot_status_config().bot_status_offline_grace_time
+    run_time: datetime = datetime.now() + timedelta(seconds=grace_sec)
+
+    logger.info(
+        format_plugin_event(
+            "bot_disconnect",
+            f"Bot [{bot_id}] disconnected, will re-check after [{grace_sec}]s grace",
+        )
+    )
 
     scheduler.add_job(
         id=job_id,
@@ -174,6 +210,10 @@ async def list_connected_bots_in_group(group_id: int) -> list[int]:
 
 async def get_bot_status_info() -> tuple[dict[int, str], dict[int, str]]:
     """获取牛牛状态信息"""
+    import time
+
+    started = time.monotonic()
+
     # 获取当前在线的牛牛
     current_bots = get_bots()
 
@@ -186,11 +226,12 @@ async def get_bot_status_info() -> tuple[dict[int, str], dict[int, str]]:
 
     async def get_nickname_with_status(bot_id: int) -> tuple[int, str, bool]:
         """获取昵称和在线状态任务"""
-        nickname = await get_bot_nickname(bot_id, current_bots)
         # NapCat/Lagrange 掉线或宽限判离线后，优先于僵尸 WS / 滞后 presence。
+        # 已标记离线的 bot 不再尝试实时查昵称，避免对协议端超时查询卡住整条命令。
         if protocol_offline_marked(bot_id):
-            offline_bots[bot_id]["nickname"] = nickname
+            nickname = offline_bots[bot_id].get("nickname", "Unknown Nickname")
             return bot_id, nickname, False
+        nickname = await get_bot_nickname(bot_id, current_bots)
         if bot_id in online_ids:
             return bot_id, nickname, True
         if bot_id in offline_bots:
@@ -217,4 +258,13 @@ async def get_bot_status_info() -> tuple[dict[int, str], dict[int, str]]:
         else:
             offline_bots_filtered[bot_id] = nickname
 
+    logger.info(
+        format_plugin_event(
+            "status_collected",
+            (
+                f"Bot status collected: {len(online_bots)} online, {len(offline_bots_filtered)} offline, "
+                f"nickname query took {(time.monotonic() - started) * 1000:.0f}ms"
+            ),
+        )
+    )
     return online_bots, offline_bots_filtered
