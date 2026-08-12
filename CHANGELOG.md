@@ -3,6 +3,12 @@
 本文件依据 git tag 历史整理，版本号遵循[语义化版本](https://semver.org/lang/zh-CN/)。
 新提交合入后请在 `## [Unreleased]` 下记录，发布时随版本 tag 归档。
 
+## [4.0.29] - 2026-08-12
+
+- 「牛牛在吗」昵称查询超时改为可配置（`bot_status_nickname_query_timeout_sec`），离线或无响应的牛牛不再拖慢整条命令。
+- 补全「牛牛在吗」的运行态与耗时日志：在线/离线数量、昵称查询耗时、命令完成耗时、上下线事件。
+- 补齐配置项的中文显示名（含既有 `bot_status_show_other_deployments`）。
+
 ## [4.0.28] - 2026-08-11
 
 - feat(logging): 统一离线检测与离线邮件事件文案
