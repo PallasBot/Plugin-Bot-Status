@@ -203,7 +203,7 @@ async def check_bot_still_offline(bot_id: int, nickname: str) -> None:
 
             await notify_bot_offline(bot_id, nickname)
         except Exception as e:
-            logger.error(f"bot [{bot_id}] offline notify_bot_offline failed: {e}")
+            logger.error(f"牛牛 [{bot_id}] 离线通知处理失败：{e}")
     else:
         # 牛牛实际上在线，从离线列表中删除
         if (

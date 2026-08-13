@@ -345,6 +345,10 @@ async def handle_bot_status(bot: Bot, event: MessageEvent) -> None:
     """处理状态查询命令"""
     import time
 
+    logger.info(
+        f"Bot [{bot.self_id}] received a bot status query from user [{event.get_user_id()}] "
+        f"in group [{getattr(event, 'group_id', None)}]"
+    )
     started = time.monotonic()
 
     def _log_done(mode: str) -> None:
@@ -384,6 +388,10 @@ async def handle_local_bot_status(bot: Bot, event: MessageEvent) -> None:
     """处理仅本部署展示的牛牛状态。"""
     import time
 
+    logger.info(
+        f"Bot [{bot.self_id}] received a local bot status query from user [{event.get_user_id()}] "
+        f"in group [{getattr(event, 'group_id', None)}]"
+    )
     started = time.monotonic()
     if isinstance(event, GroupMessageEvent):
         from pallas.api.platform import claim_group_handler

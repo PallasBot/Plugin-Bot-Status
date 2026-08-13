@@ -81,8 +81,7 @@ async def send_mail_with_retry(
             return None
         if attempt < OFFLINE_MAIL_RETRY_COUNT and is_transient_mail_error(last_error):
             logger.warning(
-                f"bot_status offline mail to owner [{email}] retry {attempt + 1}/"
-                f"{OFFLINE_MAIL_RETRY_COUNT}: {last_error}"
+                f"离线邮件发送给号主 [{email}] 失败，第 {attempt + 1}/{OFFLINE_MAIL_RETRY_COUNT} 次重试：{last_error}"
             )
             await asyncio.sleep(OFFLINE_MAIL_RETRY_DELAY_SEC)
             continue
@@ -99,7 +98,7 @@ async def get_bot_admin_emails(bot_id: int) -> list[str]:
         if admins:
             emails.extend(f"{admin_id}@qq.com" for admin_id in admins)
     except Exception as e:
-        logger.debug(f"bot [{bot_id}] bot_status get_bot_admin_emails failed: {e}")
+        logger.debug(f"获取牛牛 [{bot_id}] 号主邮箱失败：{e}")
 
     return emails
 
@@ -124,7 +123,7 @@ async def notify_bot_offline_to_owners(
     try:
         owner_ids = await get_bot_admins(bot_id)
     except Exception as e:
-        logger.debug(f"bot [{bot_id}] bot_status get_bot_admins failed: {e}")
+        logger.debug(f"获取牛牛 [{bot_id}] 号主失败：{e}")
         owner_ids = []
 
     if not owner_ids:
@@ -148,14 +147,14 @@ async def notify_bot_offline_to_owners(
         if result:
             failed += 1
             errors.append(f"号主 {owner_id}: {result}")
-            logger.error(f"bot [{bot_id}] offline mail to owner [{owner_id}@qq.com] failed: {result}")
+            logger.error(f"牛牛 [{bot_id}] 的离线提醒邮件发送给号主 [{owner_id}@qq.com] 失败：{result}")
         else:
             sent += 1
             notified_owner_ids.append(owner_id)
             logger.info(
                 format_plugin_event(
                     "offline_mail",
-                    f"Bot [{bot_id}] sent an offline notification mail to owner [{owner_id}@qq.com]",
+                    f"已向号主 [{owner_id}@qq.com] 发送牛牛 [{bot_id}] 的离线提醒邮件",
                 )
             )
         if len(owner_ids) > 1:
@@ -184,12 +183,12 @@ async def notify_bot_offline(bot_id: int, nickname: str, offline_reason: str = "
 
         result: str | None = await send_mail(title, content, mail_config)
         if result:
-            logger.error(f"bot [{bot_id}] offline notification mail failed: {result}")
+            logger.error(f"牛牛 [{bot_id}] 的离线提醒邮件发送失败：{result}")
         else:
             logger.info(
                 format_plugin_event(
                     "offline_mail",
-                    f"Bot [{bot_id}] sent an offline notification mail, target [notice_email]",
+                    f"已向通知邮箱 [notice_email] 发送牛牛 [{bot_id}] 的离线提醒邮件",
                 )
             )
 
@@ -198,18 +197,18 @@ async def notify_bot_offline(bot_id: int, nickname: str, offline_reason: str = "
                 admin_mail_config = build_mail_config(email)
                 result = await send_mail(title, content, admin_mail_config)
                 if result:
-                    logger.error(f"bot [{bot_id}] offline mail to admin [{email}] failed: {result}")
+                    logger.error(f"牛牛 [{bot_id}] 的离线提醒邮件发送给管理员 [{email}] 失败：{result}")
                 else:
                     logger.info(
                         format_plugin_event(
                             "offline_mail",
-                            f"Bot [{bot_id}] sent an offline notification mail to admin [{email}]",
+                            f"已向管理员 [{email}] 发送牛牛 [{bot_id}] 的离线提醒邮件",
                         )
                     )
             except Exception as e:
-                logger.error(f"bot [{bot_id}] offline mail to admin [{email}] exception: {e}")
+                logger.error(f"牛牛 [{bot_id}] 的离线提醒邮件发送给管理员 [{email}] 出现异常：{e}")
     else:
-        logger.warning("bot_status mail skipped: SMTP config incomplete")
+        logger.warning("离线邮件发送已跳过：SMTP 配置不完整")
 
 
 def parse_offline_mail_target(args: Message) -> int | None:
@@ -282,7 +281,7 @@ async def send_batch_offline_mails_by_owner(
         try:
             owner_ids = await get_bot_admins(bot_id)
         except Exception as e:
-            logger.debug(f"bot [{bot_id}] bot_status get_bot_admins failed: {e}")
+            logger.debug(f"获取牛牛 [{bot_id}] 号主失败：{e}")
             owner_ids = []
         if not owner_ids:
             results[bot_id] = OwnerNotifyResult(
