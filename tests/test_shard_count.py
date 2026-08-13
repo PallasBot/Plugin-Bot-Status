@@ -239,7 +239,7 @@ async def test_unified_claim_winner_proxies_the_full_count(monkeypatch: pytest.M
 
     await shard_count.run_shard_bot_count(Bot(), Event())
 
-    assert sent == [100, 300, 300]
+    assert sent == [100, 100, 300, 300]
     assert notices == []
 
 
@@ -362,3 +362,64 @@ async def test_unified_handler_does_not_count_unsent_bot_as_reported(monkeypatch
     await shard_count.run_shard_bot_count(Bot(), Event())
 
     assert completion_claims == []
+
+
+@pytest.mark.asyncio
+async def test_shard_mode_sends_collection_notice_once_from_first_reporter(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    from pallas_plugin_bot_status import shard_count
+
+    sent_as: list[tuple[int, str]] = []
+    sent_group: list[str] = []
+
+    class Bot:
+        self_id = "200"
+
+        async def send_group_msg(self, *, group_id: int, message: str) -> None:
+            sent_group.append(message)
+
+    class Event:
+        group_id = 10086
+        user_id = 20001
+        time = 30002
+
+        def get_plaintext(self) -> str:
+            return "牛牛报数"
+
+    async def run_coord(**_kwargs) -> tuple[int, int]:
+        return 1, 3
+
+    async def update_registration(**_kwargs) -> None:
+        return None
+
+    async def read_order(**_kwargs) -> list[int]:
+        return [200, 300, 100]
+
+    async def wait_turn(**_kwargs) -> bool:
+        return True
+
+    async def send_as_bot(bot_id: int, _group_id: int, message: str) -> bool:
+        sent_as.append((bot_id, message))
+        return True
+
+    async def claim_completion(**_kwargs) -> bool:
+        return True
+
+    async def sleep(_seconds: float) -> None:
+        return None
+
+    monkeypatch.setattr(shard_count.shard_ctx, "sharding_active", lambda: True)
+    monkeypatch.setattr(shard_count.shard_ctx, "is_local_representative", lambda _bot_id: False)
+    monkeypatch.setattr(shard_count, "run_shard_coordinated_bot_count", run_coord)
+    monkeypatch.setattr(shard_count, "update_shard_bot_count_registration", update_registration)
+    monkeypatch.setattr(shard_count, "get_shard_bot_count_order", read_order)
+    monkeypatch.setattr(shard_count, "wait_shard_bot_count_turn", wait_turn)
+    monkeypatch.setattr(shard_count, "send_group_message_as_bot", send_as_bot)
+    monkeypatch.setattr(shard_count, "mark_shard_bot_count_reported_and_claim_completion", claim_completion)
+    monkeypatch.setattr(shard_count.asyncio, "sleep", sleep)
+
+    await shard_count.run_shard_bot_count(Bot(), Event())
+
+    assert sent_as == [(200, "牛牛集合！")]
+    assert sent_group == ["牛牛1号报到！", "牛牛们报数完毕！"]

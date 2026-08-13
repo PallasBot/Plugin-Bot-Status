@@ -103,21 +103,26 @@ async def run_shard_bot_count(bot: Bot, event: GroupMessageEvent) -> None:
     )
     if coord is None:
         return
+    order = await get_shard_bot_count_order(
+        group_id=event.group_id,
+        user_id=int(event.user_id),
+        plaintext=plain,
+        message_time=event.time,
+    )
+    if not order:
+        return
+
+    local_ids_set = set(local_ids)
+    if order[0] in local_ids_set:
+        try:
+            sent = await send_group_message_as_bot(order[0], event.group_id, "牛牛集合！")
+        except Exception as e:
+            logger.warning(f"bot [{order[0]}] shard bot_count notice failed in group [{event.group_id}]: {e}")
+        else:
+            if not sent:
+                logger.warning(f"bot [{order[0]}] shard bot_count notice was rejected in group [{event.group_id}]")
+
     if unified:
-        order = await get_shard_bot_count_order(
-            group_id=event.group_id,
-            user_id=int(event.user_id),
-            plaintext=plain,
-            message_time=event.time,
-        )
-        if not order:
-            return
-        if order[0] == self_id:
-            try:
-                await bot.send_group_msg(group_id=event.group_id, message="牛牛集合！")
-            except Exception as e:
-                logger.warning(f"bot [{self_id}] shard bot_count notice failed in group [{event.group_id}]: {e}")
-        local_ids_set = set(local_ids)
         last_sent_bot_id: int | None = None
         last_sent_index = 0
         dispatch_started_at = time.monotonic()
