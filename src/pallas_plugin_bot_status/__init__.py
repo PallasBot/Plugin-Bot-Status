@@ -443,6 +443,13 @@ async def run_local_bot_count(bot: Bot, event: GroupMessageEvent) -> None:
     if not await is_command_cooldown_ready(event, "bot_status.count"):
         return
     await refresh_command_cooldown(event, "bot_status.count")
+    logger.info(
+        format_plugin_event(
+            "count_started",
+            f"Bot count requested in group [{event.group_id}] by [{event.user_id}], "
+            f"{len(group_bot_ids)} bots participate",
+        )
+    )
 
     seed_text = f"{datetime.now().strftime('%Y-%m-%d')}:{event.group_id}"
     random.Random(seed_text).shuffle(group_bot_ids)
@@ -457,7 +464,12 @@ async def run_local_bot_count(bot: Bot, event: GroupMessageEvent) -> None:
             last_reporting_bot = bot_instance
             await asyncio.sleep(0.3)
         except Exception as e:
-            logger.warning(f"bot [{bot_id}] bot_count send_group_msg failed in group [{event.group_id}]: {e}")
+            logger.warning(
+                format_plugin_event(
+                    "count_send_failed",
+                    f"Bot [{bot_id}] failed to send the count report in group [{event.group_id}]: {e}",
+                )
+            )
             failed_bots.append(bot_id)
 
     if failed_bots:
@@ -471,4 +483,15 @@ async def run_local_bot_count(bot: Bot, event: GroupMessageEvent) -> None:
     try:
         await sender.send_group_msg(group_id=event.group_id, message=completion)
     except Exception as e:
-        logger.warning(f"bot_count completion send failed in group [{event.group_id}]: {e}")
+        logger.warning(
+            format_plugin_event(
+                "count_done_send_failed",
+                f"Bot count completion send failed in group [{event.group_id}]: {e}",
+            )
+        )
+    logger.info(
+        format_plugin_event(
+            "count_done",
+            f"Bot count finished in group [{event.group_id}]",
+        )
+    )

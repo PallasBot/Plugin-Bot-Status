@@ -8,6 +8,7 @@ from collections.abc import Awaitable, Callable
 from typing import TYPE_CHECKING
 
 from nonebot import logger
+from pallas.api.logging import format_plugin_event
 from pallas.api.platform import (
     NS_LOCAL_CONNECTED,
     STAGGER_SEC,
@@ -48,7 +49,12 @@ def start_background_bot_count(group_id: int, work: BotCountWork) -> bool:
         try:
             done_task.result()
         except Exception as exc:
-            logger.exception("bot_count: background task failed group={}: {}", group_id, exc)
+            logger.exception(
+                format_plugin_event(
+                    "count_task_failed",
+                    f"Bot count background task failed in group [{group_id}]: {exc}",
+                )
+            )
 
     task.add_done_callback(clear_completed_task)
     return True
@@ -75,6 +81,12 @@ async def handle_shard_bot_count(
 async def run_shard_bot_count(bot: Bot, event: GroupMessageEvent) -> None:
     self_id = int(bot.self_id)
     plain = (event.get_plaintext() or "").strip()
+    logger.info(
+        format_plugin_event(
+            "count_started",
+            f"Bot count requested in group [{event.group_id}] by [{event.user_id}], self bot [{self_id}]",
+        )
+    )
     local_ids = [self_id]
     unified = not shard_ctx.sharding_active()
     if unified or shard_ctx.is_local_representative(self_id):
@@ -113,14 +125,31 @@ async def run_shard_bot_count(bot: Bot, event: GroupMessageEvent) -> None:
         return
 
     local_ids_set = set(local_ids)
+    logger.info(
+        format_plugin_event(
+            "count_ordered",
+            f"Bot count order finalized in group [{event.group_id}], {len(order)} bots participate, "
+            f"self [{self_id}] turn [{coord[0] if not unified else 0}]",
+        )
+    )
     if order[0] in local_ids_set:
         try:
             sent = await send_group_message_as_bot(order[0], event.group_id, "牛牛集合！")
         except Exception as e:
-            logger.warning(f"bot [{order[0]}] shard bot_count notice failed in group [{event.group_id}]: {e}")
+            logger.warning(
+                format_plugin_event(
+                    "count_notice_failed",
+                    f"Bot [{order[0]}] failed to send the count notice in group [{event.group_id}]: {e}",
+                )
+            )
         else:
             if not sent:
-                logger.warning(f"bot [{order[0]}] shard bot_count notice was rejected in group [{event.group_id}]")
+                logger.warning(
+                    format_plugin_event(
+                        "count_notice_rejected",
+                        f"Bot [{order[0]}] count notice was rejected in group [{event.group_id}]",
+                    )
+                )
 
     if unified:
         last_sent_bot_id: int | None = None
@@ -139,20 +168,30 @@ async def run_shard_bot_count(bot: Bot, event: GroupMessageEvent) -> None:
             )
             if not turn_ready:
                 logger.debug(
-                    "bot_count: turn timeout group={} bot={} index={}",
-                    event.group_id,
-                    bot_id,
-                    index,
+                    format_plugin_event(
+                        "count_turn_timeout",
+                        f"Bot count turn timed out in group [{event.group_id}] for bot [{bot_id}] at index [{index}]",
+                    )
                 )
             delay = (index - 1) * STAGGER_SEC - (time.monotonic() - dispatch_started_at)
             await asyncio.sleep(max(0.0, delay))
             try:
                 sent = await send_group_message_as_bot(bot_id, event.group_id, f"牛牛{index}号报到！")
             except Exception as e:
-                logger.warning(f"bot [{bot_id}] shard bot_count send failed in group [{event.group_id}]: {e}")
+                logger.warning(
+                    format_plugin_event(
+                        "count_send_failed",
+                        f"Bot [{bot_id}] failed to send the count report in group [{event.group_id}]: {e}",
+                    )
+                )
                 continue
             if not sent:
-                logger.warning(f"bot [{bot_id}] shard bot_count send was rejected in group [{event.group_id}]")
+                logger.warning(
+                    format_plugin_event(
+                        "count_send_rejected",
+                        f"Bot [{bot_id}] count report was rejected in group [{event.group_id}]",
+                    )
+                )
                 continue
             last_sent_bot_id = bot_id
             last_sent_index = index
@@ -166,6 +205,12 @@ async def run_shard_bot_count(bot: Bot, event: GroupMessageEvent) -> None:
             ):
                 await asyncio.sleep(0.3)
                 await send_group_message_as_bot(last_sent_bot_id, event.group_id, "牛牛们报数完毕！")
+                logger.info(
+                    format_plugin_event(
+                        "count_done",
+                        f"Bot count finished in group [{event.group_id}]",
+                    )
+                )
                 return
         if last_sent_bot_id is not None:
             await asyncio.sleep((len(order) - last_sent_index) * STAGGER_SEC + 0.8)
@@ -179,13 +224,24 @@ async def run_shard_bot_count(bot: Bot, event: GroupMessageEvent) -> None:
             ):
                 await asyncio.sleep(0.3)
                 await send_group_message_as_bot(last_sent_bot_id, event.group_id, "牛牛们报数完毕！")
+                logger.info(
+                    format_plugin_event(
+                        "count_done",
+                        f"Bot count finished in group [{event.group_id}]",
+                    )
+                )
         return
     index, total = coord
     await asyncio.sleep((index - 1) * STAGGER_SEC)
     try:
         await bot.send_group_msg(group_id=event.group_id, message=f"牛牛{index}号报到！")
     except Exception as e:
-        logger.warning(f"bot [{self_id}] shard bot_count send failed in group [{event.group_id}]: {e}")
+        logger.warning(
+            format_plugin_event(
+                "count_send_failed",
+                f"Bot [{self_id}] failed to send the count report in group [{event.group_id}]: {e}",
+            )
+        )
         return
     claimed_completion = await mark_shard_bot_count_reported_and_claim_completion(
         group_id=event.group_id,
@@ -210,4 +266,15 @@ async def run_shard_bot_count(bot: Bot, event: GroupMessageEvent) -> None:
         try:
             await bot.send_group_msg(group_id=event.group_id, message="牛牛们报数完毕！")
         except Exception as e:
-            logger.warning(f"bot [{self_id}] shard bot_count completion failed in group [{event.group_id}]: {e}")
+            logger.warning(
+                format_plugin_event(
+                    "count_done_send_failed",
+                    f"Bot [{self_id}] failed to send the count completion in group [{event.group_id}]: {e}",
+                )
+            )
+        logger.info(
+            format_plugin_event(
+                "count_done",
+                f"Bot count finished in group [{event.group_id}]",
+            )
+        )
